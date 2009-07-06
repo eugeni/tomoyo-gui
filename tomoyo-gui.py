@@ -13,7 +13,8 @@ except IOError:
     _ = str
 
 class TomoyoGui(gtk.Window):
-    (COLUMN_DOMAIN, COLUMN_STATE, COLUMN_CUSTOM) = range(3)
+    (COLUMN_DOMAIN, COLUMN_WEIGHT) = range(2)
+    DOMAINS=[_("Disabled"), _("Learning"), _("Permissive"), _("Enforced")]
 
     def __init__(self, policy, parent=None):
         gtk.Window.__init__(self)
@@ -39,7 +40,6 @@ class TomoyoGui(gtk.Window):
         # list of options
         lstore = gtk.ListStore(
             gobject.TYPE_STRING,
-            gobject.TYPE_STRING,
             gobject.TYPE_INT)
 
         # treeview
@@ -54,15 +54,10 @@ class TomoyoGui(gtk.Window):
         # column for option names
         renderer = gtk.CellRendererText()
         renderer.set_property('width', 400)
-        column = gtk.TreeViewColumn(_('Security domain'), renderer, text=self.COLUMN_DOMAIN, weight=self.COLUMN_CUSTOM)
+        column = gtk.TreeViewColumn(_('Security domain'), renderer, text=self.COLUMN_DOMAIN, weight=self.COLUMN_WEIGHT)
         column.set_sort_column_id(self.COLUMN_DOMAIN)
         column.set_resizable(True)
         column.set_expand(True)
-        treeview.append_column(column)
-
-        # column for values
-        column = gtk.TreeViewColumn(_('Value'), gtk.CellRendererText(), text=self.COLUMN_STATE, weight=self.COLUMN_CUSTOM)
-        column.set_sort_column_id(self.COLUMN_STATE)
         treeview.append_column(column)
 
         sw.add(treeview)
@@ -70,10 +65,16 @@ class TomoyoGui(gtk.Window):
         # building the list
         for item in self.policy.policy:
             iter = lstore.append()
+
+            # text color (quick and dirty way to find out if profile has something useful)
+            if len(self.policy.policy_dict[item]) > 1:
+                color = pango.WEIGHT_BOLD
+            else:
+                color = pango.WEIGHT_NORMAL
+
             lstore.set(iter,
                     self.COLUMN_DOMAIN, item,
-                    self.COLUMN_STATE, self.policy.policy_dict[item],
-                    self.COLUMN_CUSTOM, pango.WEIGHT_NORMAL
+                    self.COLUMN_WEIGHT, color
                     )
 
         # contents
@@ -89,6 +90,10 @@ class TomoyoGui(gtk.Window):
         # size group
         self.size_group = gtk.SizeGroup(gtk.SIZE_GROUP_HORIZONTAL)
 
+        # profile selection options
+        self.profile = gtk.combo_box_new_text()
+        for item in self.DOMAINS:
+            self.profile.append_text(item)
 
         self.show_all()
 
@@ -118,14 +123,9 @@ class TomoyoGui(gtk.Window):
         # building details
         table = gtk.Table(2, 2, False)
 
-        # profile
-        combobox = gtk.combo_box_new_text()
-        combobox.append_text(_("Disabled"))
-        combobox.append_text(_("Learning"))
-        combobox.append_text(_("Permissive"))
-        combobox.append_text(_("Enforcing"))
-        combobox.set_active(self.policy.get_profile(domain))
-        self.__add_row(table, 1, _("Profile"), combobox)
+        # profile for domain
+        self.profile.set_active(self.policy.get_profile(domain))
+        self.__add_row(table, 1, _("Profile"), self.profile)
 
         self.domain_details.add(table)
         self.domain_details.show_all()
