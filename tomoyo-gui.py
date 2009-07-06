@@ -5,6 +5,8 @@ import gobject
 import gtk
 import pango
 
+import gc
+
 # localization
 import gettext
 try:
@@ -90,21 +92,42 @@ class TomoyoGui(gtk.Window):
         # size group
         self.size_group = gtk.SizeGroup(gtk.SIZE_GROUP_HORIZONTAL)
 
-        # profile selection options
-        self.profile = gtk.combo_box_new_text()
-        for item in self.DOMAINS:
-            self.profile.append_text(item)
-
         self.show_all()
 
-    def __add_row(self, table, row, label_text, options):
-        label = gtk.Label(label_text)
+    def build_profile(self, profile):
+        """Building profile selection combobox"""
+        # profile selection options
+        cur_profile = gtk.combo_box_new_text()
+        for item in self.DOMAINS:
+            cur_profile.append_text(item)
+        cur_profile.set_active(profile)
+        return cur_profile
+
+    def __add_row(self, table, row, label_text, options=None, markup=False):
+        label = gtk.Label()
         label.set_use_underline(True)
         label.set_alignment(0, 1)
+        if markup:
+            label.set_markup(label_text)
+        else:
+            label.set_text(label_text)
         table.attach(label, 0, 1, row, row + 1, gtk.EXPAND | gtk.FILL, 0, 0, 0)
 
-        self.size_group.add_widget(options)
-        table.attach(options, 1, 2, row, row + 1, 0, 0, 0, 0)
+        if options:
+            self.size_group.add_widget(options)
+            table.attach(options, 1, 2, row, row + 1, 0, 0, 0, 0)
+
+    def format_acl(self, item):
+        """Format acl results"""
+        params = self.policy.policy_dict.get(item, None)
+        profile = 0
+        acl = []
+        for p,val in params:
+            if p == 'use_profile':
+                profile = int(val)
+                continue
+            acl.append((p, val))
+        return profile, acl
 
 
     def show_domain(self, treeview, path, col, model):
@@ -116,41 +139,52 @@ class TomoyoGui(gtk.Window):
         children = self.domain_details.get_children()
         for child in children:
             self.domain_details.remove(child)
+            del child
+        # free memory
+        gc.collect()
 
         label = gtk.Label(domain)
         label.set_line_wrap(True)
         self.domain_details.pack_start(label, False, False)
+
+        # get profile description
+        profile, acl = self.format_acl(domain)
+
         # building details
         table = gtk.Table(2, 2, False)
 
         # profile for domain
-        self.profile.set_active(self.policy.get_profile(domain))
-        self.__add_row(table, 1, _("Profile"), self.profile)
+        self.__add_row(table, 1, _("Profile"), options=self.build_profile(profile))
+
+        # building ACL
+        if len(acl) > 0:
+            self.__add_row(table, 2, _("<b>Security settings</b>"), markup=True)
+            cur_row = 3
+            for acl, item in acl:
+                self.__add_row(table, cur_row, item, options=gtk.Label(acl))
+                cur_row += 1
 
         self.domain_details.add(table)
         self.domain_details.show_all()
 
+        print repr(self.policy.policy_dict[domain])
+
 
 class TomoyoPolicy:
-    def __init__(self):
+    def __init__(self, policy="system"):
         """Initializes the policy class"""
         # TODO: support system/saved policy
-        pass
-
-    def get_profile(self, item):
-        """Gets profile status for item"""
-        params = self.policy_dict.get(item, None)
-        for p,val in params:
-            if p == 'use_profile':
-                return int(val)
-        return 0
+        if policy == "kernel":
+            self.location = "/sys/kernel/security/tomoyo/domain_policy"
+        else:
+            self.location = "/etc/tomoyo/domain_policy.conf"
 
     def parse(self):
         """Loads the policy"""
         self.policy = []
         self.policy_dict = {}
         self.policy_tree = []
-        with open("/sys/kernel/security/tomoyo/domain_policy") as fd:
+        with open(self.location) as fd:
             data = fd.readlines()
         for line in data:
             line = line.strip()
