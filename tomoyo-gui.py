@@ -33,11 +33,47 @@ class TomoyoGui(gtk.Window):
         self.main_vbox = gtk.VBox()
         self.add(self.main_vbox)
 
+        # tabs
+        self.notebook = gtk.Notebook()
+        self.main_vbox.pack_start(self.notebook)
+
+        # building the list of domains and active domains
+        all = []
+        active = []
+        for item in self.policy.policy:
+            # quick and dirty way to find out if domain is active
+            dom, val = self.policy.policy_dict[item][0]
+            if val == "0":
+                color = pango.WEIGHT_NORMAL
+            else:
+                color = pango.WEIGHT_BOLD
+                active.append((item, color))
+            all.append((item, color))
+
+        self.notebook.append_page(self.build_list_of_domains(all), gtk.Label(_("All domains")))
+        self.notebook.append_page(self.build_list_of_domains(active), gtk.Label(_("Active domains")))
+
+        # contents
+        sw2 = gtk.ScrolledWindow()
+        sw2.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
+        sw2.set_shadow_type(gtk.SHADOW_ETCHED_IN)
+        frame = gtk.Frame(_("Domain details"))
+        self.domain_details = gtk.VBox(False, 5)
+        frame.add(self.domain_details)
+        sw2.add_with_viewport(frame)
+        self.main_vbox.pack_start(sw2)
+
+        # size group
+        self.size_group = gtk.SizeGroup(gtk.SIZE_GROUP_HORIZONTAL)
+
+        self.show_all()
+
+    def build_list_of_domains(self, entries):
+        """Builds scrollable list of domains"""
         # scrolled window
         sw = gtk.ScrolledWindow()
         sw.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
         sw.set_shadow_type(gtk.SHADOW_ETCHED_IN)
-        self.main_vbox.pack_start(sw)
 
         # list of options
         lstore = gtk.ListStore(
@@ -64,35 +100,14 @@ class TomoyoGui(gtk.Window):
 
         sw.add(treeview)
 
-        # building the list
-        for item in self.policy.policy:
+        for item, color in entries:
             iter = lstore.append()
-
-            # text color (quick and dirty way to find out if profile has something useful)
-            if len(self.policy.policy_dict[item]) > 1:
-                color = pango.WEIGHT_BOLD
-            else:
-                color = pango.WEIGHT_NORMAL
-
             lstore.set(iter,
                     self.COLUMN_DOMAIN, item,
                     self.COLUMN_WEIGHT, color
                     )
+        return sw
 
-        # contents
-        sw2 = gtk.ScrolledWindow()
-        sw2.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
-        sw2.set_shadow_type(gtk.SHADOW_ETCHED_IN)
-        frame = gtk.Frame(_("Domain details"))
-        self.domain_details = gtk.VBox(False, 5)
-        frame.add(self.domain_details)
-        sw2.add_with_viewport(frame)
-        self.main_vbox.pack_start(sw2)
-
-        # size group
-        self.size_group = gtk.SizeGroup(gtk.SIZE_GROUP_HORIZONTAL)
-
-        self.show_all()
 
     def build_profile(self, profile):
         """Building profile selection combobox"""
