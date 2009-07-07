@@ -248,9 +248,19 @@ class TomoyoPolicy:
                 command, params = line.split(" ", 1)
                 self.policy_dict[domain].append((command, params))
 
+    def save(self):
+        """Saves the policy"""
+        fd = open("tomoyo.conf", "w")
+        for item in self.policy:
+            print >>fd, item
+            for acl, val in self.policy_dict[item]:
+                print >>fd, "%s %s" % (acl, val)
+            print >>fd
+
 if __name__ == "__main__":
     policy = TomoyoPolicy()
     policy.parse()
+    policy.save()
 
     TomoyoGui(policy)
     gtk.main()
