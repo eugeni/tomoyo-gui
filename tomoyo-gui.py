@@ -15,7 +15,7 @@ except IOError:
     _ = str
 
 class TomoyoGui(gtk.Window):
-    (COLUMN_DOMAIN, COLUMN_WEIGHT) = range(2)
+    (COLUMN_PATH, COLUMN_DOMAIN, COLUMN_WEIGHT) = range(3)
     DOMAINS=[_("Disabled"), _("Learning"), _("Permissive"), _("Enforced")]
 
     def __init__(self, policy, parent=None):
@@ -40,15 +40,17 @@ class TomoyoGui(gtk.Window):
         # building the list of domains and active domains
         all = []
         active = []
-        for item in self.policy.policy:
+        for i in range(len(self.policy.policy)):
             # quick and dirty way to find out if domain is active
+            item = self.policy.policy[i]
+            path = self.policy.policy_tree[i]
             dom, val = self.policy.policy_dict[item][0]
             if val == "0":
                 color = pango.WEIGHT_NORMAL
             else:
                 color = pango.WEIGHT_BOLD
-                active.append((item, color))
-            all.append((item, color))
+                active.append((path, item, color))
+            all.append((path, item, color))
 
         self.notebook.append_page(self.build_list_of_domains(all), gtk.Label(_("All domains")))
         self.notebook.append_page(self.build_list_of_domains(active), gtk.Label(_("Active domains")))
@@ -78,12 +80,13 @@ class TomoyoGui(gtk.Window):
         # list of options
         lstore = gtk.ListStore(
             gobject.TYPE_STRING,
+            gobject.TYPE_STRING,
             gobject.TYPE_INT)
 
         # treeview
         treeview = gtk.TreeView(lstore)
         treeview.set_rules_hint(True)
-        treeview.set_search_column(self.COLUMN_DOMAIN)
+        treeview.set_search_column(self.COLUMN_PATH)
 
         treeview.connect('row-activated', self.show_domain, lstore)
 
@@ -92,17 +95,18 @@ class TomoyoGui(gtk.Window):
         # column for option names
         renderer = gtk.CellRendererText()
         renderer.set_property('width', 400)
-        column = gtk.TreeViewColumn(_('Security domain'), renderer, text=self.COLUMN_DOMAIN, weight=self.COLUMN_WEIGHT)
-        column.set_sort_column_id(self.COLUMN_DOMAIN)
+        column = gtk.TreeViewColumn(_('Security domain'), renderer, text=self.COLUMN_PATH, weight=self.COLUMN_WEIGHT)
+        column.set_sort_column_id(self.COLUMN_PATH)
         column.set_resizable(True)
         column.set_expand(True)
         treeview.append_column(column)
 
         sw.add(treeview)
 
-        for item, color in entries:
+        for path, item, color in entries:
             iter = lstore.append()
             lstore.set(iter,
+                    self.COLUMN_PATH, path,
                     self.COLUMN_DOMAIN, item,
                     self.COLUMN_WEIGHT, color
                     )
@@ -199,6 +203,7 @@ class TomoyoPolicy:
         self.policy = []
         self.policy_dict = {}
         self.policy_tree = []
+        path = []
         with open(self.location) as fd:
             data = fd.readlines()
         for line in data:
@@ -213,16 +218,28 @@ class TomoyoPolicy:
                 if domain not in self.policy_dict:
                     self.policy_dict[domain] = []
                 items = line.split(" ")
-                if len(items) < 1:
-                    continue
-                self.policy_tree.append(" -> ".join(items[1:]))
+                depth = len(items)
+                last_depth = len(path) -1
+                if depth >= last_depth:
+                    del path[depth:]
+                curitems = []
+                # rebuilt item description
+                for i in range(depth):
+                    if i > last_depth:
+                        path += items[i:]
+                        curitems += items[i:]
+                        break
+                    if items[i] == path[i]:
+                        curitems.append("  ")
+                        continue
+                    curitems.append(items[i])
+                    path[i] = items[i]
+                curpath = " ".join(curitems)
+                self.policy_tree.append(curpath)
             else:
                 # an ACL
                 command, params = line.split(" ", 1)
                 self.policy_dict[domain].append((command, params))
-
-
-
 
 if __name__ == "__main__":
     policy = TomoyoPolicy()
