@@ -112,8 +112,14 @@ class TomoyoGui(gtk.Window):
                     self.COLUMN_WEIGHT, color,
                     self.COLUMN_LEVEL, level
                     )
-        return sw
 
+        # search
+        def search_domain(model, column, key, iter, data=None):
+            path = model.get_value(iter, self.COLUMN_PATH)
+            return path.find(key) < 0
+        treeview.set_search_equal_func(func=search_domain)
+
+        return sw
 
     def build_profile(self, profile):
         """Building profile selection combobox"""
@@ -156,12 +162,11 @@ class TomoyoGui(gtk.Window):
         domain = model.get_value(iter, self.COLUMN_DOMAIN)
         params = self.policy.policy_dict[domain]
 
+        # cleanup old entries
         children = self.domain_details.get_children()
         for child in children:
             self.domain_details.remove(child)
             del child
-        # free memory
-        gc.collect()
 
         label = gtk.Label(domain)
         label.set_line_wrap(True)
