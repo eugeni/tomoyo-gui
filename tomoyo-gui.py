@@ -97,7 +97,6 @@ class TomoyoGui(gtk.Window):
         renderer = gtk.CellRendererText()
         renderer.set_property('width', 400)
         column = gtk.TreeViewColumn(_('Security domain'), renderer, text=self.COLUMN_PATH, weight=self.COLUMN_WEIGHT)
-        column.set_sort_column_id(self.COLUMN_PATH)
         column.set_resizable(True)
         column.set_expand(True)
         treeview.append_column(column)
