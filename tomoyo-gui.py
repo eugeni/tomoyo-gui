@@ -15,7 +15,7 @@ except IOError:
     _ = str
 
 class TomoyoGui(gtk.Window):
-    (COLUMN_PATH, COLUMN_DOMAIN, COLUMN_WEIGHT) = range(3)
+    (COLUMN_PATH, COLUMN_DOMAIN, COLUMN_WEIGHT, COLUMN_LEVEL) = range(4)
     DOMAINS=[_("Disabled"), _("Learning"), _("Permissive"), _("Enforced")]
 
     def __init__(self, policy, parent=None):
@@ -43,14 +43,14 @@ class TomoyoGui(gtk.Window):
         for i in range(len(self.policy.policy)):
             # quick and dirty way to find out if domain is active
             item = self.policy.policy[i]
-            path = self.policy.policy_tree[i]
+            path, level = self.policy.policy_tree[i]
             dom, val = self.policy.policy_dict[item][0]
             if val == "0":
                 color = pango.WEIGHT_NORMAL
             else:
                 color = pango.WEIGHT_BOLD
-                active.append((path, item, color))
-            all.append((path, item, color))
+                active.append((path, item, color, level))
+            all.append((path, item, color, level))
 
         self.notebook.append_page(self.build_list_of_domains(all), gtk.Label(_("All domains")))
         self.notebook.append_page(self.build_list_of_domains(active), gtk.Label(_("Active domains")))
@@ -81,6 +81,7 @@ class TomoyoGui(gtk.Window):
         lstore = gtk.ListStore(
             gobject.TYPE_STRING,
             gobject.TYPE_STRING,
+            gobject.TYPE_INT,
             gobject.TYPE_INT)
 
         # treeview
@@ -103,12 +104,13 @@ class TomoyoGui(gtk.Window):
 
         sw.add(treeview)
 
-        for path, item, color in entries:
+        for path, item, color, level in entries:
             iter = lstore.append()
             lstore.set(iter,
                     self.COLUMN_PATH, path,
                     self.COLUMN_DOMAIN, item,
-                    self.COLUMN_WEIGHT, color
+                    self.COLUMN_WEIGHT, color,
+                    self.COLUMN_LEVEL, level
                     )
         return sw
 
@@ -147,7 +149,6 @@ class TomoyoGui(gtk.Window):
                 continue
             acl.append((p, val))
         return profile, acl
-
 
     def show_domain(self, treeview, path, col, model):
         """Shows details for a domain"""
@@ -223,6 +224,7 @@ class TomoyoPolicy:
                 if depth >= last_depth:
                     del path[depth:]
                 curitems = []
+                curlevel = 0
                 # rebuilt item description
                 for i in range(depth):
                     if i > last_depth:
@@ -231,11 +233,12 @@ class TomoyoPolicy:
                         break
                     if items[i] == path[i]:
                         curitems.append("  ")
+                        curlevel += 1
                         continue
                     curitems.append(items[i])
                     path[i] = items[i]
                 curpath = " ".join(curitems)
-                self.policy_tree.append(curpath)
+                self.policy_tree.append((curpath, curlevel))
             else:
                 # an ACL
                 command, params = line.split(" ", 1)
