@@ -252,9 +252,12 @@ class TomoyoPolicy:
         """Saves the policy"""
         fd = open("tomoyo.conf", "w")
         for item in self.policy:
-            print >>fd, item
+            print >>fd, "%s\n" % item
             for acl, val in self.policy_dict[item]:
                 print >>fd, "%s %s" % (acl, val)
+                # compatibility with ccs-savepolicy
+                if acl == "use_policy":
+                    print >>fd
             print >>fd
 
 if __name__ == "__main__":
