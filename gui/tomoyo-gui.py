@@ -303,9 +303,7 @@ class TomoyoPolicy:
 
 if __name__ == "__main__":
     policy = TomoyoPolicy()
-    policy.reload()
     policy.parse()
-    policy.save()
 
     TomoyoGui(policy)
     gtk.main()
