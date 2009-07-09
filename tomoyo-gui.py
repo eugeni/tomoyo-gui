@@ -6,6 +6,9 @@ import gtk
 import pango
 
 import gc
+import os
+from stat import *
+import datetime
 
 # localization
 import gettext
@@ -195,13 +198,28 @@ class TomoyoGui(gtk.Window):
 
 
 class TomoyoPolicy:
-    def __init__(self, policy="system"):
-        """Initializes the policy class"""
-        # TODO: support system/saved policy
+    POLICY_LOAD="/usr/sbin/ccs-loadpolicy a"
+    POLICY_SAVE="/usr/sbin/ccs-savepolicy a"
+    def __init__(self, policy="system", version="tomoyo"):
+        """Initializes the policy class.
+
+        If version is "tomoyo", LSM version of tomoyo is used.
+        Otherwise, if policy is "ccs", Tomoyo 1.6 policy is used.
+
+        If policy=system, reads policy from /etc/(tomoyo,css)/domain_policy.conf.
+        If policy=kernel, policy is read from /sys/kernel/security/tomoyo/domain_policy"""
+        self.policy = policy
+        self.version = version
         if policy == "kernel":
             self.location = "/sys/kernel/security/tomoyo/domain_policy"
         else:
-            self.location = "/etc/tomoyo/domain_policy.conf"
+            self.location = "/etc/%s/domain_policy.conf" % version
+        self.save_location = "domain_policy.conf"
+
+    def reload(self):
+        """Reloads the policy. If using system policy, current kernel policy is saved first"""
+        if self.policy == "system":
+            os.system(self.POLICY_SAVE)
 
     def parse(self):
         """Loads the policy"""
@@ -248,9 +266,20 @@ class TomoyoPolicy:
                 command, params = line.split(" ", 1)
                 self.policy_dict[domain].append((command, params))
 
-    def save(self):
-        """Saves the policy"""
-        fd = open("tomoyo.conf", "w")
+    def save(self, reload=True):
+        """Saves the policy. If reload=True, the saved policy is loaded into kernel"""
+        time = datetime.datetime.now().strftime("%F.%T")
+        filename = "domain_policy.%s.conf" % time
+        full_filename = "/etc/%s/%s" % (self.version, filename)
+        # are we working on a real file or a symbolic link?
+        status = os.lstat(self.location)
+        if S_ISLNK(status.st_mode):
+            # remove old link, new one will be created instead
+            os.unlink(self.location)
+            os.symlink(filename, self.location)
+        else:
+            os.rename(self.location, "%s.old" % self.location)
+        fd = open(full_filename, "w")
         for item in self.policy:
             print >>fd, "%s\n" % item
             for acl, val in self.policy_dict[item]:
@@ -259,9 +288,13 @@ class TomoyoPolicy:
                 if acl == "use_policy":
                     print >>fd
             print >>fd
+        if reload:
+            os.system(self.POLICY_LOAD)
+
 
 if __name__ == "__main__":
     policy = TomoyoPolicy()
+    policy.reload()
     policy.parse()
     policy.save()
 
