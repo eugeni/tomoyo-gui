@@ -223,7 +223,11 @@ class TomoyoGui(gtk.Window):
         self.domain_details.add(table)
         self.domain_details.show_all()
 
-        print repr(self.policy.policy_dict[domain])
+        # debugging output
+        print domain
+        for i, v in self.policy.policy_dict[domain]:
+            print "\t%s: %s" % (i, v)
+        print
 
 
 class TomoyoPolicy:
