@@ -42,7 +42,7 @@ class TomoyoGui(gtk.Window):
 
         toolbar_item = gtk.ToolButton("Refresh")
         toolbar_item.set_stock_id(gtk.STOCK_REFRESH)
-        toolbar_item.connect("clicked", lambda *w: self.refresh_domains(self.all_domains, self.active_domains))
+        toolbar_item.connect("clicked", lambda *w: self.refresh_domains(self.all_domains, self.active_domains, reload=True))
         toolbar.insert(toolbar_item, -1)
 
         toolbar_item = gtk.ToolButton("Quit")
@@ -51,7 +51,6 @@ class TomoyoGui(gtk.Window):
         toolbar.insert(toolbar_item, -1)
 
         self.main_vbox.pack_start(toolbar, False, False)
-
 
         # tabs
         self.notebook = gtk.Notebook()
@@ -81,9 +80,13 @@ class TomoyoGui(gtk.Window):
 
         self.show_all()
 
-    def refresh_domains(self, lstore_all, lstore_active):
+    def refresh_domains(self, lstore_all, lstore_active, reload=True):
         """Refresh the list of domain entries"""
         # building the list of domains and active domains
+
+        # reload policy from disk?
+        if reload:
+            self.policy.reload()
 
         lstore_all.clear()
         lstore_active.clear()
@@ -246,9 +249,6 @@ class TomoyoPolicy:
         """Reloads the policy. If using system policy, current kernel policy is saved first"""
         if self.policy == "system":
             os.system(self.POLICY_SAVE)
-
-    def parse(self):
-        """Loads the policy"""
         self.policy = []
         self.policy_dict = {}
         self.policy_tree = []
@@ -320,7 +320,6 @@ class TomoyoPolicy:
 
 if __name__ == "__main__":
     policy = TomoyoPolicy()
-    policy.parse()
 
     TomoyoGui(policy)
     gtk.main()
