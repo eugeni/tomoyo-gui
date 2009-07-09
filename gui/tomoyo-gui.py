@@ -40,23 +40,14 @@ class TomoyoGui(gtk.Window):
         self.notebook = gtk.Notebook()
         self.main_vbox.pack_start(self.notebook)
 
-        # building the list of domains and active domains
-        all = []
-        active = []
-        for i in range(len(self.policy.policy)):
-            # quick and dirty way to find out if domain is active
-            item = self.policy.policy[i]
-            path, level = self.policy.policy_tree[i]
-            dom, val = self.policy.policy_dict[item][0]
-            if val == "0":
-                color = pango.WEIGHT_NORMAL
-            else:
-                color = pango.WEIGHT_BOLD
-                active.append((path, item, color, level))
-            all.append((path, item, color, level))
+        # domains
+        all, active = self.refresh_domains()
 
-        self.notebook.append_page(self.build_list_of_domains(all), gtk.Label(_("All domains")))
-        self.notebook.append_page(self.build_list_of_domains(active), gtk.Label(_("Active domains")))
+        sw_all, self.all_domains = self.build_list_of_domains(all)
+        sw_active, self.active_domains = self.build_list_of_domains(active)
+
+        self.notebook.append_page(sw_all, gtk.Label(_("All domains")))
+        self.notebook.append_page(sw_active, gtk.Label(_("Active domains")))
 
         # contents
         sw2 = gtk.ScrolledWindow()
@@ -72,6 +63,25 @@ class TomoyoGui(gtk.Window):
         self.size_group = gtk.SizeGroup(gtk.SIZE_GROUP_HORIZONTAL)
 
         self.show_all()
+
+    def refresh_domains(self):
+        """Refresh the list of domain entries"""
+        # building the list of domains and active domains
+        all = []
+        active = []
+        for i in range(len(self.policy.policy)):
+            # quick and dirty way to find out if domain is active
+            item = self.policy.policy[i]
+            path, level = self.policy.policy_tree[i]
+            dom, val = self.policy.policy_dict[item][0]
+            if val == "0":
+                color = pango.WEIGHT_NORMAL
+            else:
+                color = pango.WEIGHT_BOLD
+                active.append((path, item, color, level))
+            all.append((path, item, color, level))
+        return all, active
+
 
     def build_list_of_domains(self, entries):
         """Builds scrollable list of domains"""
@@ -121,7 +131,7 @@ class TomoyoGui(gtk.Window):
             return path.find(key) < 0
         treeview.set_search_equal_func(func=search_domain)
 
-        return sw
+        return sw, lstore
 
     def build_profile(self, profile):
         """Building profile selection combobox"""
