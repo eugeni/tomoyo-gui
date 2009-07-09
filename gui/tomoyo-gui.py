@@ -36,6 +36,23 @@ class TomoyoGui(gtk.Window):
         self.main_vbox = gtk.VBox()
         self.add(self.main_vbox)
 
+        # toolbar
+        toolbar = gtk.Toolbar()
+        toolbar.set_style(gtk.TOOLBAR_BOTH)
+
+        toolbar_item = gtk.ToolButton("Refresh")
+        toolbar_item.set_stock_id(gtk.STOCK_REFRESH)
+        toolbar_item.connect("clicked", lambda *w: self.refresh_domains(self.all_domains, self.active_domains))
+        toolbar.insert(toolbar_item, -1)
+
+        toolbar_item = gtk.ToolButton("Quit")
+        toolbar_item.set_stock_id(gtk.STOCK_QUIT)
+        toolbar_item.connect("clicked", lambda *w: gtk.main_quit())
+        toolbar.insert(toolbar_item, -1)
+
+        self.main_vbox.pack_start(toolbar, False, False)
+
+
         # tabs
         self.notebook = gtk.Notebook()
         self.main_vbox.pack_start(self.notebook)
