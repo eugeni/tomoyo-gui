@@ -263,12 +263,6 @@ class TomoyoGui(gtk.Window):
 
         self.domain_details.show_all()
 
-        # debugging output
-        print domain
-        for i, v in self.policy.policy_dict[domain]:
-            print "\t%s: %s" % (i, v)
-        print
-
     def expand_domain(self, treeview, path, col, model):
         start_path = path
         iter = model.get_iter(path)
