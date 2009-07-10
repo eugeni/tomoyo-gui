@@ -89,6 +89,9 @@ class TomoyoGui(gtk.Window):
         # size group
         self.size_group = gtk.SizeGroup(gtk.SIZE_GROUP_HORIZONTAL)
 
+        # show initial help
+        self.show_help()
+
         self.show_all()
 
     def show_help(self):
