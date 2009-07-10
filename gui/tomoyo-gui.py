@@ -106,6 +106,8 @@ class TomoyoGui(gtk.Window):
         cur_row += 1
         self.__add_row(table, cur_row, _("You may also select a group of domains to apply settings to them at once."))
         cur_row += 1
+        self.__add_row(table, cur_row, _("Start typing a name of an application to quickly locate it in the list"))
+        cur_row += 1
         self.__add_row(table, cur_row, _("Use the toolbar to refresh current policy from the kernel, or save your settings."))
         cur_row += 1
         self.__add_row(table, cur_row, _("Have a nice TOMOYO experience :)"))
