@@ -1,0 +1,10 @@
+TODO:
+- implement domain profile changes
+- implement ACL editing
+- implement app-based domain generation (for example, save selection as a new application)
+- add support for app-based profile merging
+- profile cpu/memory usage for profile parsing
+- ask before leaving if changes were made but unsaved
+- add icons
+- integrate to MCC
+- ask to install tomoyo when necessary and configure initial ACL
