@@ -131,6 +131,7 @@ class TomoyoGui(gtk.Window):
         treeview.set_search_column(self.COLUMN_PATH)
 
         treeview.connect('row-activated', self.show_domain, lstore)
+        treeview.connect('cursor-changed', self.select_domain)
 
         # configuring columns
 
@@ -187,9 +188,10 @@ class TomoyoGui(gtk.Window):
             acl.append((p, val))
         return profile, acl
 
-    def show_domain(self, treeview, path, col, model):
-        """Shows details for a domain"""
-        iter = model.get_iter(path)
+    def select_domain(self, treeview):
+        """A domain is selected"""
+        selection = treeview.get_selection()
+        model, iter = selection.get_selected()
         domain = model.get_value(iter, self.COLUMN_DOMAIN)
         params = self.policy.policy_dict[domain]
 
@@ -229,6 +231,10 @@ class TomoyoGui(gtk.Window):
             print "\t%s: %s" % (i, v)
         print
 
+
+    def show_domain(self, treeview, path, col, model):
+        """Shows details for a domain"""
+        return self.select_domain(treeview)
 
 class TomoyoPolicy:
     POLICY_LOAD="/usr/sbin/ccs-loadpolicy a"
