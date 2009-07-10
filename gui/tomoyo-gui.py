@@ -79,6 +79,19 @@ class TomoyoGui(gtk.Window):
         # size group
         self.size_group = gtk.SizeGroup(gtk.SIZE_GROUP_HORIZONTAL)
 
+        # show default text
+        table, cur_row = self.refresh_details(self.domain_details, _("Security Configuration for TOMOYO Linux"))
+        self.__add_row(table, cur_row, _("This application allows you to fine-tune the security settings for TOMOYO."))
+        cur_row += 1
+        self.__add_row(table, cur_row, _("Select a security domain to view and edit its settings."))
+        cur_row += 1
+        self.__add_row(table, cur_row, _("Alternatively, you may double-click on a security domain to select all subdomains for a domain."))
+        cur_row += 1
+        self.__add_row(table, cur_row, _("You may also select a group of domains to apply settings to them at once."))
+        cur_row += 1
+        self.__add_row(table, cur_row, _("Use the toolbar to refresh current policy from the kernel, or save your settings."))
+        cur_row += 1
+        self.__add_row(table, cur_row, _("Have a nice TOMOYO experience :)"))
         self.show_all()
 
     def refresh_domains(self, lstore_all, lstore_active, reload=True):
