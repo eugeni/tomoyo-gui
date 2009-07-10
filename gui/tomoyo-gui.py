@@ -22,6 +22,7 @@ class TomoyoGui(gtk.Window):
     DOMAINS=[_("Disabled"), _("Learning"), _("Permissive"), _("Enforced")]
 
     def __init__(self, policy, parent=None):
+        """Initializes main window and GUI"""
         gtk.Window.__init__(self)
         try:
             self.set_screen(parent.get_screen())
@@ -166,10 +167,12 @@ class TomoyoGui(gtk.Window):
         cur_profile.set_active(profile)
         return cur_profile
 
-    def __add_row(self, table, row, label_text, options=None, markup=False):
+    def __add_row(self, table, row, label_text, options=None, markup=False, wrap=False):
         label = gtk.Label()
         label.set_use_underline(True)
         label.set_alignment(0, 1)
+        if wrap:
+            label.set_line_wrap(wrap)
         if markup:
             label.set_markup(label_text)
         else:
@@ -208,18 +211,18 @@ class TomoyoGui(gtk.Window):
 
             # update title
             self.refresh_details(self.domain_details, domains[0])
+            table, cur_row = self.refresh_details(self.domain_details, _("Configure profile for a group"))
             # building details
-            table = gtk.Table(2, 2, False)
-            self.domain_details.add(table)
 
             # get profile description
             profile, acl = self.format_acl(domains[0])
-            self.__add_row(table, 1, _("Profile"), options=self.build_profile(profile))
+            self.__add_row(table, cur_row, _("Profile"), options=self.build_profile(profile))
+            cur_row += 1
 
             # building ACL
             if len(domains) > 0:
-                self.__add_row(table, 2, _("<b>Sub-domains</b>"), markup=True)
-                cur_row = 3
+                self.__add_row(table, cur_row, _("<b>Sub-domains</b>"), markup=True)
+                cur_row += 1
                 for domain in domains:
                     self.__add_row(table, cur_row, domain)
                     cur_row += 1
@@ -229,7 +232,7 @@ class TomoyoGui(gtk.Window):
             return
 
     def refresh_details(self, container, title):
-        """Removes all children of a container"""
+        """Updates description of a domain or group of domains"""
         children = container.get_children()
         for child in children:
             container.remove(child)
@@ -238,25 +241,28 @@ class TomoyoGui(gtk.Window):
         label.set_line_wrap(True)
         container.pack_start(label, False, False)
 
+        # building details
+        table = gtk.Table(2, 2, False)
+        container.add(table)
+        start_row = 1
+        return table, start_row
+
     def show_domain(self, model, iter):
         """Shows domain details"""
         domain = model.get_value(iter, self.COLUMN_DOMAIN)
         params = self.policy.policy_dict[domain]
 
-        self.refresh_details(self.domain_details, domain)
-
-        # building details
-        table = gtk.Table(2, 2, False)
-        self.domain_details.add(table)
+        table, cur_row = self.refresh_details(self.domain_details, _("Configure ACL for %s") % domain)
 
         # get profile description
         profile, acl = self.format_acl(domain)
-        self.__add_row(table, 1, _("Profile"), options=self.build_profile(profile))
+        self.__add_row(table, cur_row, _("Profile"), options=self.build_profile(profile))
+        cur_row += 1
 
         # building ACL
         if len(acl) > 0:
-            self.__add_row(table, 2, _("<b>Security settings</b>"), markup=True)
-            cur_row = 3
+            self.__add_row(table, cur_row, _("<b>Security settings</b>"), markup=True)
+            cur_row += 1
             for acl, item in acl:
                 self.__add_row(table, cur_row, item, options=gtk.Label(acl))
                 cur_row += 1
@@ -264,6 +270,7 @@ class TomoyoGui(gtk.Window):
         self.domain_details.show_all()
 
     def expand_domain(self, treeview, path, col, model):
+        """Locates all subdomains for a domain"""
         start_path = path
         iter = model.get_iter(path)
         initial_level = model.get_value(iter, self.COLUMN_LEVEL)
