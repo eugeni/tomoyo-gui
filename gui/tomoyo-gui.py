@@ -89,6 +89,10 @@ class TomoyoGui(gtk.Window):
         # size group
         self.size_group = gtk.SizeGroup(gtk.SIZE_GROUP_HORIZONTAL)
 
+        self.show_all()
+
+    def show_help(self):
+        """Shows initial help text"""
         # show default text
         table, cur_row = self.refresh_details(self.domain_details, _("Security Configuration for TOMOYO Linux"))
         self.__add_row(table, cur_row, _("This application allows you to fine-tune the security settings for TOMOYO."))
@@ -102,7 +106,7 @@ class TomoyoGui(gtk.Window):
         self.__add_row(table, cur_row, _("Use the toolbar to refresh current policy from the kernel, or save your settings."))
         cur_row += 1
         self.__add_row(table, cur_row, _("Have a nice TOMOYO experience :)"))
-        self.show_all()
+        self.domain_details.show_all()
 
     def save_domains(self, reload=False):
         """Saves and, optionally, reload current policy"""
@@ -236,6 +240,9 @@ class TomoyoGui(gtk.Window):
                 domain = model.get_value(iter, self.COLUMN_DOMAIN)
                 domains.append(domain)
 
+            if len(domains) < 1:
+                self.show_help()
+                return
             # update title
             self.refresh_details(self.domain_details, domains[0])
             table, cur_row = self.refresh_details(self.domain_details, _("Configure profile for a group"))
