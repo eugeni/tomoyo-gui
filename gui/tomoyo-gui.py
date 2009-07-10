@@ -46,6 +46,16 @@ class TomoyoGui(gtk.Window):
         toolbar_item.connect("clicked", lambda *w: self.refresh_domains(self.all_domains, self.active_domains, reload=True))
         toolbar.insert(toolbar_item, -1)
 
+        toolbar_item = gtk.ToolButton("Save")
+        toolbar_item.set_stock_id(gtk.STOCK_SAVE)
+        toolbar_item.connect("clicked", lambda *w: self.save_domains())
+        toolbar.insert(toolbar_item, -1)
+
+        toolbar_item = gtk.ToolButton(label="Save and apply")
+        toolbar_item.set_stock_id(gtk.STOCK_APPLY)
+        toolbar_item.connect("clicked", lambda *w: self.save_domains(reload=True))
+        toolbar.insert(toolbar_item, -1)
+
         toolbar_item = gtk.ToolButton("Quit")
         toolbar_item.set_stock_id(gtk.STOCK_QUIT)
         toolbar_item.connect("clicked", lambda *w: gtk.main_quit())
@@ -93,6 +103,10 @@ class TomoyoGui(gtk.Window):
         cur_row += 1
         self.__add_row(table, cur_row, _("Have a nice TOMOYO experience :)"))
         self.show_all()
+
+    def save_domains(self, reload=False):
+        """Saves and, optionally, reload current policy"""
+        self.policy.save(reload)
 
     def refresh_domains(self, lstore_all, lstore_active, reload=True):
         """Refresh the list of domain entries"""
