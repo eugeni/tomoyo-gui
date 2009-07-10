@@ -130,8 +130,12 @@ class TomoyoGui(gtk.Window):
         treeview.set_rules_hint(True)
         treeview.set_search_column(self.COLUMN_PATH)
 
-        treeview.connect('row-activated', self.show_domain, lstore)
-        treeview.connect('cursor-changed', self.select_domain)
+        treeview.connect('row-activated', self.expand_domain, lstore)
+
+        # selection
+        selection = treeview.get_selection()
+        selection.set_mode(gtk.SELECTION_MULTIPLE)
+        selection.connect('changed', self.select_domain)
 
         # configuring columns
 
@@ -188,30 +192,65 @@ class TomoyoGui(gtk.Window):
             acl.append((p, val))
         return profile, acl
 
-    def select_domain(self, treeview):
+    def select_domain(self, selection):
         """A domain is selected"""
-        selection = treeview.get_selection()
-        model, iter = selection.get_selected()
+        model, rows = selection.get_selected_rows()
+        if selection.count_selected_rows() == 1:
+            # just one item is selected
+            iter = model.get_iter(rows[0])
+            return self.show_domain(model, iter)
+        else:
+            domains = []
+            for item in rows:
+                iter = model.get_iter(item)
+                domain = model.get_value(iter, self.COLUMN_DOMAIN)
+                domains.append(domain)
+
+            # update title
+            self.refresh_details(self.domain_details, domains[0])
+            # building details
+            table = gtk.Table(2, 2, False)
+            self.domain_details.add(table)
+
+            # get profile description
+            profile, acl = self.format_acl(domains[0])
+            self.__add_row(table, 1, _("Profile"), options=self.build_profile(profile))
+
+            # building ACL
+            if len(domains) > 0:
+                self.__add_row(table, 2, _("<b>Sub-domains</b>"), markup=True)
+                cur_row = 3
+                for domain in domains:
+                    self.__add_row(table, cur_row, domain)
+                    cur_row += 1
+
+            self.domain_details.show_all()
+
+            return
+
+    def refresh_details(self, container, title):
+        """Removes all children of a container"""
+        children = container.get_children()
+        for child in children:
+            container.remove(child)
+            del child
+        label = gtk.Label(title)
+        label.set_line_wrap(True)
+        container.pack_start(label, False, False)
+
+    def show_domain(self, model, iter):
+        """Shows domain details"""
         domain = model.get_value(iter, self.COLUMN_DOMAIN)
         params = self.policy.policy_dict[domain]
 
-        # cleanup old entries
-        children = self.domain_details.get_children()
-        for child in children:
-            self.domain_details.remove(child)
-            del child
-
-        label = gtk.Label(domain)
-        label.set_line_wrap(True)
-        self.domain_details.pack_start(label, False, False)
-
-        # get profile description
-        profile, acl = self.format_acl(domain)
+        self.refresh_details(self.domain_details, domain)
 
         # building details
         table = gtk.Table(2, 2, False)
+        self.domain_details.add(table)
 
-        # profile for domain
+        # get profile description
+        profile, acl = self.format_acl(domain)
         self.__add_row(table, 1, _("Profile"), options=self.build_profile(profile))
 
         # building ACL
@@ -222,7 +261,6 @@ class TomoyoGui(gtk.Window):
                 self.__add_row(table, cur_row, item, options=gtk.Label(acl))
                 cur_row += 1
 
-        self.domain_details.add(table)
         self.domain_details.show_all()
 
         # debugging output
@@ -231,10 +269,34 @@ class TomoyoGui(gtk.Window):
             print "\t%s: %s" % (i, v)
         print
 
+    def expand_domain(self, treeview, path, col, model):
+        start_path = path
+        iter = model.get_iter(path)
+        initial_level = model.get_value(iter, self.COLUMN_LEVEL)
+        domains = []
+        last_iter = iter
+        # detecting all subdomains
+        while True:
+            iter = model.iter_next(iter)
+            if not iter:
+                break
+            domain = model.get_value(iter, self.COLUMN_DOMAIN)
+            cur_level = model.get_value(iter, self.COLUMN_LEVEL)
+            domains.append(domain)
+            if cur_level <= initial_level:
+                break
+            last_iter = iter
+        end_path = model.get_path(last_iter)
 
-    def show_domain(self, treeview, path, col, model):
-        """Shows details for a domain"""
-        return self.select_domain(treeview)
+        # update selection
+        selection = treeview.get_selection()
+
+        # updating details widget
+        selection.select_range(start_path, end_path)
+
+        # show details for the selected domains
+        self.select_domain(selection)
+
 
 class TomoyoPolicy:
     POLICY_LOAD="/usr/sbin/ccs-loadpolicy a"
