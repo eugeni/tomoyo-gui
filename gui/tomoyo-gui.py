@@ -194,14 +194,27 @@ class TomoyoGui(gtk.Window):
 
         return sw, lstore
 
-    def build_profile(self, profile):
+    def build_profile(self, profile, domains):
         """Building profile selection combobox"""
         # profile selection options
+        print domains
         cur_profile = gtk.combo_box_new_text()
         for item in self.DOMAINS:
             cur_profile.append_text(item)
         cur_profile.set_active(profile)
+        cur_profile.connect('changed', self.change_profile, domains)
         return cur_profile
+
+    def change_profile(self, cur_profile, domains):
+        """Change profile for domains"""
+        new_profile = cur_profile.get_active()
+        for domain in domains:
+            params = self.policy.policy_dict.get(domain)
+            for i in range(len(params)):
+                p, val = params[i]
+                if p == 'use_profile':
+                    params[i] = (p, new_profile)
+                    break
 
     def __add_row(self, table, row, label_text, options=None, markup=False, wrap=False, entry=None):
         label = gtk.Label()
@@ -284,7 +297,7 @@ class TomoyoGui(gtk.Window):
 
             # get profile description
             profile, acl = self.format_acl(domains[0])
-            self.__add_row(table, cur_row, _("Profile"), options=self.build_profile(profile))
+            self.__add_row(table, cur_row, _("Profile"), options=self.build_profile(profile, domains))
             cur_row += 1
 
             # building ACL
@@ -324,7 +337,7 @@ class TomoyoGui(gtk.Window):
 
         # get profile description
         profile, acl = self.format_acl(domain)
-        self.__add_row(table, cur_row, _("Profile"), options=self.build_profile(profile))
+        self.__add_row(table, cur_row, _("Profile"), options=self.build_profile(profile, [domain]))
         cur_row += 1
 
         # building ACL
