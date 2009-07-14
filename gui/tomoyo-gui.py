@@ -268,8 +268,56 @@ class TomoyoGui(gtk.Window):
     def edit_acl(self, menuitem, entry):
         """An entry will be changed"""
         domain, pos, item = entry
-        print "Changing:"
-        print entry
+        print "Editing %s [%s]:" % (domain, item)
+        params = self.policy.policy_dict.get(domain)
+        acl, path = params[pos]
+        dialog = gtk.Dialog(_("Editing ACL"),
+                self, 0,
+                (gtk.STOCK_OK, gtk.RESPONSE_OK,
+                gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL))
+        # option title
+        label = gtk.Label("Domain: %s" % domain)
+        label.set_use_markup(False)
+        dialog.vbox.pack_start(label)
+        label.set_use_markup(True)
+        dialog.vbox.pack_start(label)
+        dialog.vbox.pack_start(label)
+        dialog.vbox.pack_start(gtk.HSeparator())
+
+        # new acl
+        hbox = gtk.HBox()
+        label = gtk.Label(_("<b>Path:</b>"))
+        label.set_use_markup(True)
+        hbox.pack_start(label, False, False)
+        entry_path = gtk.Entry()
+        entry_path.set_text(item)
+        hbox.pack_start(entry_path, False, False)
+        dialog.vbox.pack_start(hbox)
+
+        hbox = gtk.HBox()
+        label = gtk.Label("<b>ACL: %s</b>" % acl)
+        label.set_use_markup(True)
+        hbox.pack_start(label, False, False)
+        entry_acl = gtk.Entry()
+        entry_acl.set_text(acl)
+        hbox.pack_start(entry_acl, False, False)
+        dialog.vbox.pack_start(hbox)
+
+        dialog.show_all()
+        response = dialog.run()
+        if response != gtk.RESPONSE_OK:
+            dialog.destroy()
+            return
+
+        new_item = entry_path.get_text()
+        new_acl = entry_acl.get_text()
+        dialog.destroy()
+
+        params[pos] = (new_acl, new_item)
+        print "%s -> %s, %s -> %s" % (item, acl, new_item, new_acl)
+
+        # refresh domain data
+        self.show_domain_details(domain)
 
     def delete_acl(self, menuitem, entry):
         """An entry will be deleted"""
