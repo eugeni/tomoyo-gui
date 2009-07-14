@@ -277,10 +277,6 @@ class TomoyoGui(gtk.Window):
                 gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL))
         # option title
         label = gtk.Label("Domain: %s" % domain)
-        label.set_use_markup(False)
-        dialog.vbox.pack_start(label)
-        label.set_use_markup(True)
-        dialog.vbox.pack_start(label)
         dialog.vbox.pack_start(label)
         dialog.vbox.pack_start(gtk.HSeparator())
 
@@ -295,7 +291,7 @@ class TomoyoGui(gtk.Window):
         dialog.vbox.pack_start(hbox)
 
         hbox = gtk.HBox()
-        label = gtk.Label("<b>ACL: %s</b>" % acl)
+        label = gtk.Label("<b>ACL:</b>")
         label.set_use_markup(True)
         hbox.pack_start(label, False, False)
         entry_acl = gtk.Entry()
