@@ -1,0 +1,13 @@
+#!/bin/sh
+#
+# Wrapper for tomoyo-gui.py
+#
+
+if [ "`whoami`" != "root" ]; then
+    echo 'tomoyo-gui: sorry, you must be root !'
+    exit 1
+fi
+
+GUI=/usr/lib/tomoyo-mdv/tomoyo-gui.py
+
+exec $GUI
