@@ -204,27 +204,44 @@ class TomoyoGui(gtk.Window):
         return cur_profile
 
     def __add_row(self, table, row, label_text, options=None, markup=False, wrap=False, entry=None):
-        if entry:
-            # entry is clickable
-            label = gtk.Button(label_text)
-            label.set_relief(gtk.RELIEF_NONE)
-            label.set_use_underline(False)
-            label.connect('clicked', self.entry_clicked, entry)
-        else:
-            label = gtk.Label()
-            label.set_use_underline(True)
-            if wrap:
-                label.set_line_wrap(wrap)
-            if markup:
-                label.set_markup(label_text)
-            else:
-                label.set_text(label_text)
+        label = gtk.Label()
+        label.set_use_underline(True)
         label.set_alignment(0, 1)
-        table.attach(label, 0, 1, row, row + 1, gtk.EXPAND | gtk.FILL, 0, 0, 0)
+        if wrap:
+            label.set_line_wrap(wrap)
+        if markup or entry:
+            label.set_markup(label_text)
+        else:
+            label.set_label(label_text)
+        label.label_text = label_text
+        if entry:
+            eventbox = gtk.EventBox()
+            eventbox.connect('enter-notify-event', self.show_controls, entry, label)
+            eventbox.connect('leave-notify-event', self.hide_controls, entry, label)
+            eventbox.connect('button-press-event', self.edit_entry, entry, label)
+            eventbox.add(label)
+            item = eventbox
+        else:
+            item = label
+        table.attach(item, 0, 1, row, row + 1, gtk.EXPAND | gtk.FILL, 0, 0, 0)
 
         if options:
             self.size_group.add_widget(options)
             table.attach(options, 1, 2, row, row + 1, 0, 0, 0, 0)
+
+    def show_controls(self, widget, event, entry, label):
+        """Showing controls for an entry"""
+        label.set_markup("<u>%s</u>" % label.label_text)
+        label.get_window().set_cursor(gtk.gdk.Cursor(gtk.gdk.HAND2))
+
+    def hide_controls(self, widget, event, entry, label):
+        """Hides controls for an entry"""
+        label.set_markup(label.label_text)
+
+    def edit_entry(self, widget, event, entry, label):
+        """Hides controls for an entry"""
+        print entry
+        label.set_markup(label.label_text)
 
     def entry_clicked(self, button, entry):
         """An ACL entry was clicked"""
