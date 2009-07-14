@@ -247,14 +247,38 @@ class TomoyoGui(gtk.Window):
         label.set_markup("<u>%s</u>" % label.label_text)
         label.get_window().set_cursor(gtk.gdk.Cursor(gtk.gdk.HAND2))
 
+
     def hide_controls(self, widget, event, entry, label):
         """Hides controls for an entry"""
         label.set_markup(label.label_text)
 
     def edit_entry(self, widget, event, entry, label):
         """Hides controls for an entry"""
+        # TODO: handle both buttons
+        popupMenu = gtk.Menu()
+        menuPopup1 = gtk.ImageMenuItem (gtk.STOCK_EDIT)
+        menuPopup1.connect('activate', self.edit_acl, entry)
+        popupMenu.add(menuPopup1)
+        menuPopup2 = gtk.ImageMenuItem (gtk.STOCK_DELETE)
+        menuPopup2.connect('activate', self.delete_acl, entry)
+        popupMenu.add(menuPopup2)
+        popupMenu.show_all()
+        popupMenu.popup(None, None, None, 1, 0, entry)
+
+    def edit_acl(self, menuitem, entry):
+        """An entry will be changed"""
+        domain, pos, item = entry
+        print "Changing:"
         print entry
-        label.set_markup(label.label_text)
+
+    def delete_acl(self, menuitem, entry):
+        """An entry will be deleted"""
+        domain, pos, item = entry
+        print "Deleting %s [%s]:" % (domain, item)
+        params = self.policy.policy_dict.get(domain)
+        del params[pos]
+        # refresh domain data
+        self.show_domain_details(domain)
 
     def entry_clicked(self, button, entry):
         """An ACL entry was clicked"""
@@ -331,6 +355,10 @@ class TomoyoGui(gtk.Window):
     def show_domain(self, model, iter):
         """Shows domain details"""
         domain = model.get_value(iter, self.COLUMN_DOMAIN)
+        return self.show_domain_details(domain)
+
+    def show_domain_details(self, domain):
+        """Displays domain details"""
         params = self.policy.policy_dict[domain]
 
         table, cur_row = self.refresh_details(self.domain_details, _("Configure ACL for %s") % domain)
