@@ -203,32 +203,44 @@ class TomoyoGui(gtk.Window):
         cur_profile.set_active(profile)
         return cur_profile
 
-    def __add_row(self, table, row, label_text, options=None, markup=False, wrap=False):
-        label = gtk.Label()
-        label.set_use_underline(True)
-        label.set_alignment(0, 1)
-        if wrap:
-            label.set_line_wrap(wrap)
-        if markup:
-            label.set_markup(label_text)
+    def __add_row(self, table, row, label_text, options=None, markup=False, wrap=False, entry=None):
+        if entry:
+            # entry is clickable
+            label = gtk.Button(label_text)
+            label.set_relief(gtk.RELIEF_NONE)
+            label.set_use_underline(False)
+            label.connect('clicked', self.entry_clicked, entry)
         else:
-            label.set_text(label_text)
+            label = gtk.Label()
+            label.set_use_underline(True)
+            if wrap:
+                label.set_line_wrap(wrap)
+            if markup:
+                label.set_markup(label_text)
+            else:
+                label.set_text(label_text)
+        label.set_alignment(0, 1)
         table.attach(label, 0, 1, row, row + 1, gtk.EXPAND | gtk.FILL, 0, 0, 0)
 
         if options:
             self.size_group.add_widget(options)
             table.attach(options, 1, 2, row, row + 1, 0, 0, 0, 0)
 
+    def entry_clicked(self, button, entry):
+        """An ACL entry was clicked"""
+        print "Clicked on %s" % str(entry)
+
     def format_acl(self, item):
         """Format acl results"""
         params = self.policy.policy_dict.get(item, None)
         profile = 0
         acl = []
-        for p,val in params:
+        for i in range(len(params)):
+            p,val = params[i]
             if p == 'use_profile':
                 profile = int(val)
                 continue
-            acl.append((p, val))
+            acl.append((i, p, val))
         return profile, acl
 
     def select_domain(self, selection):
@@ -302,8 +314,8 @@ class TomoyoGui(gtk.Window):
         if len(acl) > 0:
             self.__add_row(table, cur_row, _("<b>Security settings</b>"), markup=True)
             cur_row += 1
-            for acl, item in acl:
-                self.__add_row(table, cur_row, item, options=gtk.Label(acl))
+            for pos, acl, item in acl:
+                self.__add_row(table, cur_row, item, options=gtk.Label(acl), entry = (domain, pos, item))
                 cur_row += 1
 
         self.domain_details.show_all()
