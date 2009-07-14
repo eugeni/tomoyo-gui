@@ -8,6 +8,6 @@ if [ "`whoami`" != "root" ]; then
     exit 1
 fi
 
-GUI=/usr/lib/tomoyo-mdv/tomoyo-gui.py
+GUI=/usr/share/tomoyo-mdv/tomoyo-gui.py
 
 exec $GUI

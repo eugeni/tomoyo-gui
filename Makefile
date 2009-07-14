@@ -15,9 +15,9 @@ clean:
 
 install: all
 	mkdir -p $(RPM_BUILD_ROOT)/etc/tomoyo/
-	mkdir -p $(RPM_BUILD_ROOT)/usr/lib/tomoyo-mdv
+	mkdir -p $(RPM_BUILD_ROOT)/usr/share/tomoyo-mdv
 	mkdir -p $(RPM_BUILD_ROOT)/usr/sbin
-	cp gui/*.py* $(RPM_BUILD_ROOT)/usr/lib/tomoyo-mdv
+	cp gui/*.py* $(RPM_BUILD_ROOT)/usr/share/tomoyo-mdv
 	install -m755 gui/tomoyo-gui $(RPM_BUILD_ROOT)/usr/sbin
 
 cleandist:
