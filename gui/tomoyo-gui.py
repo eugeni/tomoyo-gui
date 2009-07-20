@@ -9,6 +9,8 @@ import gc
 import os
 from stat import *
 import datetime
+import getopt
+import sys
 
 # localization
 import gettext
@@ -17,25 +19,25 @@ try:
 except IOError:
     _ = str
 
-class TomoyoGui(gtk.Window):
+class TomoyoGui:
     (COLUMN_PATH, COLUMN_DOMAIN, COLUMN_WEIGHT, COLUMN_LEVEL) = range(4)
     DOMAINS=[_("Disabled"), _("Learning"), _("Permissive"), _("Enforced")]
 
-    def __init__(self, policy, parent=None):
+    def __init__(self, policy, embed=None):
         """Initializes main window and GUI"""
-        gtk.Window.__init__(self)
-        try:
-            self.set_screen(parent.get_screen())
-        except AttributeError:
-            self.connect('destroy', lambda *w: gtk.main_quit())
-        self.set_title(self.__class__.__name__)
-        self.set_default_size(640, 480)
+        if embed:
+            self.window = gtk.Plug(embed)
+        else:
+            self.window = gtk.Window()
+            self.window.set_title(_("Tomoyo GUI"))
+            self.window.set_default_size(640, 440)
+        self.window.connect('delete-event', lambda *w: gtk.main_quit())
 
         self.policy = policy
 
         # main vbox
         self.main_vbox = gtk.VBox()
-        self.add(self.main_vbox)
+        self.window.add(self.main_vbox)
 
         # toolbar
         toolbar = gtk.Toolbar()
@@ -96,7 +98,7 @@ class TomoyoGui(gtk.Window):
         # show initial help
         self.show_help()
 
-        self.show_all()
+        self.window.show_all()
 
     def show_help(self):
         """Shows initial help text"""
@@ -547,9 +549,41 @@ class TomoyoPolicy:
         if reload:
             os.system(self.POLICY_LOAD)
 
+# {{{ usage
+def usage():
+    """Prints help message"""
+    print """Tomoyo GUI.
+
+Arguments to msecgui:
+    -h, --help              displays this helpful message.
+    -e, --embedded <XID>    embed in MCC.
+"""
+# }}}
+
 
 if __name__ == "__main__":
+    PlugWindowID = None
+
+    # parse command line
+    try:
+        opt, args = getopt.getopt(sys.argv[1:], 'he:', ['help', 'embedded='])
+    except getopt.error:
+        usage()
+        sys.exit(1)
+    for o in opt:
+        # help
+        if o[0] == '-h' or o[0] == '--help':
+            usage()
+            sys.exit(0)
+        # list
+        elif o[0] == '-e' or o[0] == '--embedded':
+            try:
+                PlugWindowID = long(o[1])
+            except:
+                print >>sys.stderr, "Error: bad master window XID (%s)!" % o[1]
+                sys.exit(1)
+
     policy = TomoyoPolicy()
 
-    TomoyoGui(policy)
+    TomoyoGui(policy, embed=PlugWindowID)
     gtk.main()
