@@ -10,4 +10,4 @@ fi
 
 GUI=/usr/share/tomoyo-mdv/tomoyo-gui.py
 
-exec $GUI
+exec $GUI $*
