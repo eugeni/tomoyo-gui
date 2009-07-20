@@ -12,6 +12,8 @@ import datetime
 import getopt
 import sys
 
+DEBUG=False
+
 # localization
 import gettext
 try:
@@ -203,7 +205,8 @@ class TomoyoGui:
     def build_profile(self, profile, domains):
         """Building profile selection combobox"""
         # profile selection options
-        print domains
+        if DEBUG:
+            print domains
         cur_profile = gtk.combo_box_new_text()
         for item in self.DOMAINS:
             cur_profile.append_text(item)
@@ -274,7 +277,8 @@ class TomoyoGui:
     def edit_acl(self, menuitem, entry):
         """An entry will be changed"""
         domain, pos, item = entry
-        print "Editing %s [%s]:" % (domain, item)
+        if DEBUG:
+            print "Editing %s [%s]:" % (domain, item)
         params = self.policy.policy_dict.get(domain)
         acl, path = params[pos]
         dialog = gtk.Dialog(_("Editing ACL"),
@@ -316,7 +320,8 @@ class TomoyoGui:
         dialog.destroy()
 
         params[pos] = (new_acl, new_item)
-        print "%s -> %s, %s -> %s" % (item, acl, new_item, new_acl)
+        if DEBUG:
+            print "%s -> %s, %s -> %s" % (item, acl, new_item, new_acl)
 
         # refresh domain data
         self.show_domain_details(domain)
@@ -324,7 +329,8 @@ class TomoyoGui:
     def delete_acl(self, menuitem, entry):
         """An entry will be deleted"""
         domain, pos, item = entry
-        print "Deleting %s [%s]:" % (domain, item)
+        if DEBUG:
+            print "Deleting %s [%s]:" % (domain, item)
         params = self.policy.policy_dict.get(domain)
         del params[pos]
         # refresh domain data
@@ -332,7 +338,8 @@ class TomoyoGui:
 
     def entry_clicked(self, button, entry):
         """An ACL entry was clicked"""
-        print "Clicked on %s" % str(entry)
+        if DEBUG:
+            print "Clicked on %s" % str(entry)
 
     def format_acl(self, item):
         """Format acl results"""
@@ -556,6 +563,7 @@ def usage():
 
 Arguments to msecgui:
     -h, --help              displays this helpful message.
+    -d, --debug             enable debugging output
     -e, --embedded <XID>    embed in MCC.
 """
 # }}}
@@ -566,7 +574,7 @@ if __name__ == "__main__":
 
     # parse command line
     try:
-        opt, args = getopt.getopt(sys.argv[1:], 'he:', ['help', 'embedded='])
+        opt, args = getopt.getopt(sys.argv[1:], 'hde:', ['help', 'debug', 'embedded='])
     except getopt.error:
         usage()
         sys.exit(1)
@@ -576,6 +584,8 @@ if __name__ == "__main__":
             usage()
             sys.exit(0)
         # list
+        elif o[0] == '-d' or o[0] == '--debug':
+            DEBUG=True
         elif o[0] == '-e' or o[0] == '--embedded':
             try:
                 PlugWindowID = long(o[1])
