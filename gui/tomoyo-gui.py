@@ -488,23 +488,27 @@ class TomoyoPolicy:
         """Reloads the policy. If using system policy, current kernel policy is saved first"""
         if self.policy == "system":
             os.system(self.POLICY_SAVE)
-        self.policy = []
-        self.policy_dict = {}
-        self.policy_tree = []
-        path = []
+        self.policy, self.policy_dict, self.policy_tree = self.read_policy(self.location)
+
+    def read_policy(self, location):
+        """Reads a policy from file"""
         with open(self.location) as fd:
             data = fd.readlines()
+        domains = []
+        domains_dict = {}
+        domains_tree = []
+        path = []
         for line in data:
             line = line.strip()
             if not line:
                 continue
-            # parse policy
+            # parse domains
             if line.find('<kernel>') == 0:
                 # it is a security domain
                 domain = line
-                self.policy.append(domain)
-                if domain not in self.policy_dict:
-                    self.policy_dict[domain] = []
+                domains.append(domain)
+                if domain not in domains_dict:
+                    domains_dict[domain] = []
                 items = line.split(" ")
                 depth = len(items)
                 last_depth = len(path) -1
@@ -525,11 +529,12 @@ class TomoyoPolicy:
                     curitems.append(items[i])
                     path[i] = items[i]
                 curpath = " ".join(curitems)
-                self.policy_tree.append((curpath, curlevel))
+                domains_tree.append((curpath, curlevel))
             else:
                 # an ACL
                 command, params = line.split(" ", 1)
-                self.policy_dict[domain].append((command, params))
+                domains_dict[domain].append((command, params))
+        return domains, domains_dict, domains_tree
 
     def save(self, reload=True):
         """Saves the policy. If reload=True, the saved policy is loaded into kernel"""
@@ -544,8 +549,14 @@ class TomoyoPolicy:
             os.symlink(filename, self.location)
         else:
             os.rename(self.location, "%s.old" % self.location)
+        self.write_policy(full_filename, self.policy)
+        if reload:
+            os.system(self.POLICY_LOAD)
+
+    def write_policy(self, filename, entries):
+        """Exports specified entries to a file"""
         fd = open(full_filename, "w")
-        for item in self.policy:
+        for item in entries:
             print >>fd, "%s\n" % item
             for acl, val in self.policy_dict[item]:
                 print >>fd, "%s %s" % (acl, val)
@@ -553,8 +564,6 @@ class TomoyoPolicy:
                 if acl == "use_policy":
                     print >>fd
             print >>fd
-        if reload:
-            os.system(self.POLICY_LOAD)
 
 # {{{ usage
 def usage():
