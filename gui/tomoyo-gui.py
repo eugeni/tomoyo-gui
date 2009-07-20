@@ -39,26 +39,30 @@ class TomoyoGui(gtk.Window):
 
         # toolbar
         toolbar = gtk.Toolbar()
-        toolbar.set_style(gtk.TOOLBAR_BOTH)
+        toolbar.set_style(gtk.TOOLBAR_ICONS)
 
         toolbar_item = gtk.ToolButton("Refresh")
         toolbar_item.set_stock_id(gtk.STOCK_REFRESH)
         toolbar_item.connect("clicked", lambda *w: self.refresh_domains(self.all_domains, self.active_domains, reload=True))
+        toolbar_item.set_tooltip_text(_("Refresh policy"))
         toolbar.insert(toolbar_item, -1)
 
         toolbar_item = gtk.ToolButton("Save")
         toolbar_item.set_stock_id(gtk.STOCK_SAVE)
         toolbar_item.connect("clicked", lambda *w: self.save_domains())
+        toolbar_item.set_tooltip_text(_("Save policy"))
         toolbar.insert(toolbar_item, -1)
 
         toolbar_item = gtk.ToolButton(label="Save and apply")
         toolbar_item.set_stock_id(gtk.STOCK_APPLY)
         toolbar_item.connect("clicked", lambda *w: self.save_domains(reload=True))
+        toolbar_item.set_tooltip_text(_("Save and apply policy"))
         toolbar.insert(toolbar_item, -1)
 
         toolbar_item = gtk.ToolButton("Quit")
         toolbar_item.set_stock_id(gtk.STOCK_QUIT)
         toolbar_item.connect("clicked", lambda *w: gtk.main_quit())
+        toolbar_item.set_tooltip_text(_("Quit without saving"))
         toolbar.insert(toolbar_item, -1)
 
         self.main_vbox.pack_start(toolbar, False, False)
