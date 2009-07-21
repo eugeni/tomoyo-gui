@@ -63,6 +63,19 @@ class TomoyoGui:
         toolbar_item.set_tooltip_text(_("Save and apply policy"))
         toolbar.insert(toolbar_item, -1)
 
+        toolbar.insert(gtk.SeparatorToolItem(), -1)
+
+        # policy exporting
+        self.export_domains = gtk.ToolButton("Export")
+        self.export_domains.set_stock_id(gtk.STOCK_SAVE_AS)
+        self.export_domains.connect("clicked", self.export_policy)
+        self.export_domains.set_tooltip_text(_("Export selected policy"))
+        self.export_domains.set_sensitive(False)
+        self.selected_domains = None
+        toolbar.insert(self.export_domains, -1)
+
+        toolbar.insert(gtk.SeparatorToolItem(), -1)
+
         toolbar_item = gtk.ToolButton("Quit")
         toolbar_item.set_stock_id(gtk.STOCK_QUIT)
         toolbar_item.connect("clicked", lambda *w: gtk.main_quit())
@@ -101,6 +114,21 @@ class TomoyoGui:
         self.show_help()
 
         self.window.show_all()
+
+    def export_policy(self, widget):
+        """Exports selected domains into a file"""
+        if DEBUG:
+            print "Exporting %s" % str(self.selected_domains)
+        chooser = gtk.FileChooserDialog(title=_("Policy export"),action=gtk.FILE_CHOOSER_ACTION_SAVE,
+                      buttons=(gtk.STOCK_CANCEL,gtk.RESPONSE_CANCEL,gtk.STOCK_SAVE,gtk.RESPONSE_OK))
+        chooser.set_current_name("policy.conf")
+        response = chooser.run()
+        if response == gtk.RESPONSE_OK:
+            filename = chooser.get_filename()
+        else:
+            return
+        chooser.destroy()
+        self.policy.write_policy(filename, self.selected_domains)
 
     def show_help(self):
         """Shows initial help text"""
@@ -282,7 +310,7 @@ class TomoyoGui:
         params = self.policy.policy_dict.get(domain)
         acl, path = params[pos]
         dialog = gtk.Dialog(_("Editing ACL"),
-                self, 0,
+                self.window, 0,
                 (gtk.STOCK_OK, gtk.RESPONSE_OK,
                 gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL))
         # option title
@@ -291,22 +319,22 @@ class TomoyoGui:
         dialog.vbox.pack_start(gtk.HSeparator())
 
         # new acl
-        hbox = gtk.HBox()
+        hbox = gtk.HBox(spacing=5)
         label = gtk.Label(_("<b>Path:</b>"))
         label.set_use_markup(True)
         hbox.pack_start(label, False, False)
         entry_path = gtk.Entry()
         entry_path.set_text(item)
-        hbox.pack_start(entry_path, False, False)
+        hbox.pack_start(entry_path)
         dialog.vbox.pack_start(hbox)
 
-        hbox = gtk.HBox()
+        hbox = gtk.HBox(spacing=5)
         label = gtk.Label("<b>ACL:</b>")
         label.set_use_markup(True)
         hbox.pack_start(label, False, False)
         entry_acl = gtk.Entry()
         entry_acl.set_text(acl)
-        hbox.pack_start(entry_acl, False, False)
+        hbox.pack_start(entry_acl)
         dialog.vbox.pack_start(hbox)
 
         dialog.show_all()
@@ -356,12 +384,18 @@ class TomoyoGui:
 
     def select_domain(self, selection):
         """A domain is selected"""
+        self.selected_domains = None
         model, rows = selection.get_selected_rows()
-        if selection.count_selected_rows() == 1:
+        if selection.count_selected_rows() == 0:
+            self.export_domains.set_sensitive(False)
+            return
+        elif selection.count_selected_rows() == 1:
             # just one item is selected
+            self.export_domains.set_sensitive(False)
             iter = model.get_iter(rows[0])
             return self.show_domain(model, iter)
         else:
+            self.export_domains.set_sensitive(True)
             domains = []
             for item in rows:
                 iter = model.get_iter(item)
@@ -371,6 +405,7 @@ class TomoyoGui:
             if len(domains) < 1:
                 self.show_help()
                 return
+            self.selected_domains = domains
             # update title
             self.refresh_details(self.domain_details, domains[0])
             table, cur_row = self.refresh_details(self.domain_details, _("Configure profile for a group"))
@@ -438,6 +473,8 @@ class TomoyoGui:
     def expand_domain(self, treeview, path, col, model):
         """Locates all subdomains for a domain"""
         start_path = path
+        if DEBUG:
+            print "Expanding %s" % str(path)
         iter = model.get_iter(path)
         initial_level = model.get_value(iter, self.COLUMN_LEVEL)
         domains = []
@@ -555,7 +592,7 @@ class TomoyoPolicy:
 
     def write_policy(self, filename, entries):
         """Exports specified entries to a file"""
-        fd = open(full_filename, "w")
+        fd = open(filename, "w")
         for item in entries:
             print >>fd, "%s\n" % item
             for acl, val in self.policy_dict[item]:
