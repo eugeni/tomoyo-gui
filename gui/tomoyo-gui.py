@@ -371,6 +371,9 @@ class TomoyoGui:
 
     def format_acl(self, item):
         """Format acl results"""
+        # TODO: we could rearrange the list of entries so use_profile comes always first,
+        # and include the policy level into the dict as well. This would get rid of
+        # policy_tree structure
         params = self.policy.policy_dict.get(item, None)
         profile = 0
         acl = []
