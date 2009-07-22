@@ -125,10 +125,8 @@ class TomoyoGui:
         response = chooser.run()
         if response == gtk.RESPONSE_OK:
             filename = chooser.get_filename()
-        else:
-            return
+            self.policy.write_policy(filename, self.selected_domains)
         chooser.destroy()
-        self.policy.write_policy(filename, self.selected_domains)
 
     def show_help(self):
         """Shows initial help text"""
