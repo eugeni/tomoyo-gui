@@ -1,5 +1,5 @@
 PACKAGE = tomoyo-gui
-VERSION = 0.01
+VERSION = 0.02
 GITPATH = ssh://git.mandriva.com/git/projects/tomoyo-mdv.git
 
 all: version gui
