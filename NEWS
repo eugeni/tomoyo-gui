@@ -1,6 +1,7 @@
 Mandriva Tomoyo GUI -- History of user-visible changes
 Copyright (C) 2009, Mandriva
 
+* Show informative window when loading big tomoyo policy
 * Handle cases when tomoyo policy was not correctly installed (#53382)
 
 Version 0.02 (released 2009-07-22)
