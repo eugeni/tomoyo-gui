@@ -149,7 +149,19 @@ class TomoyoGui:
 
     def save_domains(self, reload=False):
         """Saves and, optionally, reload current policy"""
-        self.policy.save(reload)
+        ret = self.policy.save(reload)
+        if not ret:
+            dialog = gtk.MessageDialog(
+                    parent=self.window,
+                    flags=0,
+                    type=gtk.MESSAGE_ERROR,
+                    message_format = _("Unable to save TOMOYO policy! Please certify that ccs-tools package is installed and operational."),
+                    buttons=gtk.BUTTONS_OK
+                    )
+            dialog.show_all()
+            dialog.run()
+            dialog.destroy()
+
 
     def refresh_domains(self, lstore_all, lstore_active, reload=True):
         """Refresh the list of domain entries"""
@@ -157,7 +169,18 @@ class TomoyoGui:
 
         # reload policy from disk?
         if reload:
-            self.policy.reload()
+            ret = self.policy.reload()
+            if not ret:
+                dialog = gtk.MessageDialog(
+                        parent=self.window,
+                        flags=0,
+                        type=gtk.MESSAGE_ERROR,
+                        message_format = _("Unable to load TOMOYO policy! Please certify that ccs-tools package is installed and operational."),
+                        buttons=gtk.BUTTONS_OK
+                        )
+                dialog.show_all()
+                dialog.run()
+                dialog.destroy()
 
         lstore_all.clear()
         lstore_active.clear()
@@ -512,7 +535,7 @@ class TomoyoPolicy:
         If version is "tomoyo", LSM version of tomoyo is used.
         Otherwise, if policy is "ccs", Tomoyo 1.6 policy is used.
 
-        If policy=system, reads policy from /etc/(tomoyo,css)/domain_policy.conf.
+        If policy=system, reads policy from /etc/(tomoyo,ccs)/domain_policy.conf.
         If policy=kernel, policy is read from /sys/kernel/security/tomoyo/domain_policy"""
         self.policy = policy
         self.version = version
@@ -526,12 +549,20 @@ class TomoyoPolicy:
         """Reloads the policy. If using system policy, current kernel policy is saved first"""
         if self.policy == "system":
             os.system(self.POLICY_SAVE)
-        self.policy, self.policy_dict, self.policy_tree = self.read_policy(self.location)
+        success, self.policy, self.policy_dict, self.policy_tree = self.read_policy(self.location)
+        return success
 
     def read_policy(self, location):
         """Reads a policy from file"""
-        with open(self.location) as fd:
-            data = fd.readlines()
+        success = True
+        try:
+            with open(self.location) as fd:
+                data = fd.readlines()
+        except:
+            # unable to open policy file
+            print >>sys.stderr, "Unable to open policy file: %s" % self.location
+            data = []
+            success = False
         domains = []
         domains_dict = {}
         domains_tree = []
@@ -572,7 +603,7 @@ class TomoyoPolicy:
                 # an ACL
                 command, params = line.split(" ", 1)
                 domains_dict[domain].append((command, params))
-        return domains, domains_dict, domains_tree
+        return success, domains, domains_dict, domains_tree
 
     def save(self, reload=True):
         """Saves the policy. If reload=True, the saved policy is loaded into kernel"""
@@ -580,16 +611,21 @@ class TomoyoPolicy:
         filename = "domain_policy.%s.conf" % time
         full_filename = "/etc/%s/%s" % (self.version, filename)
         # are we working on a real file or a symbolic link?
-        status = os.lstat(self.location)
-        if S_ISLNK(status.st_mode):
-            # remove old link, new one will be created instead
-            os.unlink(self.location)
-            os.symlink(filename, self.location)
-        else:
-            os.rename(self.location, "%s.old" % self.location)
-        self.write_policy(full_filename, self.policy)
+        try:
+            status = os.lstat(self.location)
+            if S_ISLNK(status.st_mode):
+                # remove old link, new one will be created instead
+                os.unlink(self.location)
+                os.symlink(filename, self.location)
+            else:
+                os.rename(self.location, "%s.old" % self.location)
+            self.write_policy(full_filename, self.policy)
+        except:
+            print >>sys.stderr, "Unable to save TOMOYO policy: %s" % sys.exc_value[1]
+            return False
         if reload:
             os.system(self.POLICY_LOAD)
+        return True
 
     def write_policy(self, filename, entries):
         """Exports specified entries to a file"""
