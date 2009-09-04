@@ -92,8 +92,6 @@ class TomoyoGui:
         sw_all, self.all_domains = self.build_list_of_domains()
         sw_active, self.active_domains = self.build_list_of_domains()
 
-        self.refresh_domains(self.all_domains, self.active_domains)
-
         self.notebook.append_page(sw_all, gtk.Label(_("All domains")))
         self.notebook.append_page(sw_active, gtk.Label(_("Active domains")))
 
@@ -114,6 +112,8 @@ class TomoyoGui:
         self.show_help()
 
         self.window.show_all()
+
+        self.refresh_domains(self.all_domains, self.active_domains)
 
     def export_policy(self, widget):
         """Exports selected domains into a file"""
@@ -169,8 +169,30 @@ class TomoyoGui:
 
         # reload policy from disk?
         if reload:
+            # show some informative window
+            progress = gtk.Window()
+            progress.set_title(_("Please wait..."))
+            progress.set_transient_for(self.window)
+            progress.set_modal(True)
+            progress.connect('delete-event', lambda *w: None)
+
+            vbox = gtk.VBox(spacing=10)
+            progress.add(vbox)
+            vbox.add(gtk.Label("Please wait, loading TOMOYO policy..."))
+
+            # show window
+            progress.show_all()
+            while gtk.events_pending():
+                gtk.main_iteration(False)
+
+            # reload policy
             ret = self.policy.reload()
+
+            # kill progress window
+            progress.destroy()
+
             if not ret:
+                # something went wrong..
                 dialog = gtk.MessageDialog(
                         parent=self.window,
                         flags=0,
