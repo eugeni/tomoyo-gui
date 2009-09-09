@@ -197,7 +197,7 @@ class TomoyoGui:
                         parent=self.window,
                         flags=0,
                         type=gtk.MESSAGE_ERROR,
-                        message_format = _("Unable to load TOMOYO policy! Please certify that ccs-tools package is installed and operational."),
+                        message_format = _("Unable to load TOMOYO policy! Please certify that ccs-tools package is installed and operational and run /usr/lib/ccs/tomoyo_init_policy.sh."),
                         buttons=gtk.BUTTONS_OK
                         )
                 dialog.show_all()
