@@ -1,6 +1,7 @@
 Mandriva Tomoyo GUI -- History of user-visible changes
 Copyright (C) 2009, Mandriva
 
+Version 0.04 (released 2009-09-10)
 * Added help for all tabs
 * Displaying exceptions in gui (read-only for now)
 * Loading exceptions
