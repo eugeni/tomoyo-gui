@@ -1,6 +1,8 @@
 Mandriva Tomoyo GUI -- History of user-visible changes
 Copyright (C) 2009, Mandriva
 
+* Added help for all tabs
+* Displaying exceptions in gui (read-only for now)
 * Loading exceptions
 * Creating initial tomoyo policy when necessary
 
