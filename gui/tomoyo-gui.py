@@ -227,8 +227,6 @@ class TomoyoGui:
                 if ret == gtk.RESPONSE_YES:
                     # installing policy
                     self.install_policy()
-                    # try reloading the policy again
-                    self.policy.reload()
 
 
         lstore_all.clear()
@@ -290,12 +288,34 @@ class TomoyoGui:
         while 1:
             self.process_events()
             if not q.empty():
+                result = q.get()
                 break
             else:
                 progressbar.pulse()
                 time.sleep(0.5)
 
         progress.destroy()
+
+        if result != False:
+            text = _("TOMOYO policy was initialized successfully. Please reboot your machine to activate and start using it."),
+            type = gtk.MESSAGE_INFO
+        else:
+            text = _("An error occured while initializing TOMOYO policy. You might have to run /usr/lib/ccs/tomoyo_init_policy.sh manually."),
+            type = gtk.MESSAGE_ERROR
+        # policy was initialized
+        dialog = gtk.MessageDialog(
+                parent=self.window,
+                flags=0,
+                type=type,
+                message_format = text,
+                buttons=gtk.BUTTONS_OK
+                )
+        dialog.show_all()
+        dialog.run()
+        dialog.destroy()
+        # leave
+        gtk.main_quit()
+
 
     def build_list_of_domains(self):
         """Builds scrollable list of domains"""
