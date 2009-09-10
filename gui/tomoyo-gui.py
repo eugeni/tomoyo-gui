@@ -101,7 +101,7 @@ class TomoyoGui:
     (COLUMN_PATH, COLUMN_DOMAIN, COLUMN_WEIGHT, COLUMN_LEVEL) = range(4)
     DOMAINS=[_("Disabled"), _("Learning"), _("Permissive"), _("Enforced")]
 
-    def __init__(self, policy, embed=None):
+    def __init__(self, policy, embed=None, execution_path="/usr/share/tomoyo-mdv"):
         """Initializes main window and GUI"""
         if embed:
             self.window = gtk.Plug(embed)
@@ -112,6 +112,7 @@ class TomoyoGui:
         self.window.connect('delete-event', lambda *w: gtk.main_quit())
 
         self.policy = policy
+        self.execution_path = execution_path
 
         # main vbox
         self.main_vbox = gtk.VBox()
@@ -203,6 +204,10 @@ class TomoyoGui:
         self.notebook.append_page(sw_exceptions, gtk.Label(_("Exceptions")))
         self.add_page_help("Exceptions")
 
+        # help
+        self.notebook.append_page(self.build_help(), gtk.Label(_("Help")))
+        self.add_page_help("Help")
+
     def add_page_help(self, page):
         """Associates tab number with contents"""
         self.page_help[self.num_pages] = page
@@ -239,10 +244,13 @@ class TomoyoGui:
         elif tab == "Exceptions":
             title = tab
             help = HELP_EXCEPTIONS
-        else:
+        elif tab == "Help":
             # default help text
-            title = _("Security Configuration for TOMOYO Linux")
+            title = _("Help for TOMOYO Linux gui")
             help = HELP_DEFAULT
+        else:
+            # no help, leaving
+            return
         if len(help) > 0:
             table, cur_row = self.refresh_details(self.domain_details, title)
             for line in help:
@@ -428,6 +436,21 @@ class TomoyoGui:
             exceptions[item] = exceptions_list
         vbox.show_all()
         return vbox, exceptions
+
+    def build_help(self):
+        """Build help screen"""
+        vbox = gtk.VBox()
+        vbox.show_all()
+        try:
+            image = gtk.Image()
+            pixbuf = gtk.gdk.pixbuf_new_from_file("%s/%s" % (self.execution_path, "tomoyo.png"))
+            image.set_from_pixbuf(pixbuf)
+            vbox.pack_start(image)
+        except:
+            # image not found?
+            print >>sys.stderr, "Unable to find tomoyo logo: %s/%s" % (self.execution_path, "tomoyo.png")
+        vbox.show_all()
+        return vbox
 
     def build_exceptions_for_class(self, item):
         """Builds list of exceptions of given type"""
