@@ -16,6 +16,8 @@ from threading import Thread
 from Queue import Queue
 import time
 
+import textwrap
+
 DEBUG=False
 
 # localization
@@ -24,6 +26,58 @@ try:
     gettext.install("msec")
 except IOError:
     _ = str
+
+def multiline_help(help):
+    """Helper function to wrap and format multi-line help text"""
+    text = []
+    for s in help:
+        for l in textwrap.wrap(s, 80):
+            text.append(l)
+        text.append("")
+    return text
+# help text
+HELP_ALL_DOMAINS=multiline_help([_("""This view displays all security domains known to TOMOYO.
+Each domain represents the complete application execution chain, from kernel to the last executed application.
+To simplify the visualization, subdomains are displayed on separate lines."""),
+_("""If you click on a domain, you may change the TOMOYO settings for it, such as the execution policy
+(which specifies whether TOMOYO should ignore this domain, learn its actions, preview or enforce the security settings).
+By default, all domains are disabled. To start using TOMOYO, select a domain and change its policy to Learning.
+Afterwards, use the application normally. TOMOYO will learn from the application actions, such as file accesses, application executions and so on.
+""")
+])
+
+HELP_ACTIVE_DOMAINS=multiline_help([_("""This view displays all security domains known to TOMOYO which are currently enabled.
+For these domains, the TOMOYO policy is either in Learning, Permissive or Enforced mode.
+You may use this view to have a quick view on security domains currently active on your system.
+""")])
+
+HELP_EXCEPTIONS=multiline_help([_("""This view displays the exceptions known to TOMOYO.
+The following kinds of exceptions are supported:"""),
+_("""<b>alias</b>: indicates different paths that point to the same file (e.g., symlinks).
+This keyword is intended to allow programs that behave differently depending on the name of invocation and that referenced using symbolic links instead of hard links transit domain using the symbolic link's name.
+For example, /sbin/pidof is a symbolic link to /sbin/killall5.
+In normal case, if /sbin/pidof is executed, the domain is defined as if /sbin/killall5 is executed. By specifying "alias /sbin/killall5 /sbin/pidof", you can run /sbin/pidof in the domain for /sbin/pidof."""),
+_("""<b>file_pattern</b>: When file access requests arise in learning mode, the pathnames are automatically patterned according to patterns specified using this keyword.
+This keyword is used for only reducing the burden of policy tuning which is needed after the learning mode by making already known pathname patterns as templates."""),
+_("""<b>allow_read</b>: Used to grant unconditionally readable permissions to files.
+This keyword is intended to reduce size of domain policy by granting read access to library files such as GLIBC and locale files."""),
+_("""<b>deny_rewrite</b>: Files whose pathname match the patterns are not permitted to open for writing without append mode or truncate unless the pathnames are explicitly granted using allow_rewrite keyword in domain policy."""),
+_("""<b>initialize_domain</b>: allows to initialize domain transition when specific program is executed."""),
+_("""<b>no_initialize_domain</b>: prevents a program from initializing a new domain transition."""),
+_("""<b>keep_domain</b>: used to prevent domain transition when program is executed from specific domain.
+This directive is intended to reduce total number of domains and memory usage by suppressing unneeded domain transitions."""),
+_("""<b>no_keep_domain</b>: Use this directive when you want to escape from a domain that is kept by "keep_domain" directive."""),
+])
+
+HELP_DEFAULT=multiline_help([_("""
+This application allows you to fine-tune the security settings for TOMOYO.
+Select a security domain to view and edit its settings.
+Alternatively, you may double-click on a security domain to select all subdomains for a domain.
+You may also select a group of domains to apply settings to them at once.
+Start typing a name of an application to quickly locate it in the list
+Use the toolbar to refresh current policy from the kernel, or save your settings.
+Have a nice TOMOYO experience :)
+""")])
 
 class TomoyoInstaller(Thread):
     # tomoyo policy installer
@@ -109,13 +163,19 @@ class TomoyoGui:
         # tabs
         self.notebook = gtk.Notebook()
         self.main_vbox.pack_start(self.notebook)
+        self.notebook.connect('switch-page', self.show_help_for_page)
 
         # domains
         sw_all, self.all_domains = self.build_list_of_domains()
         sw_active, self.active_domains = self.build_list_of_domains()
 
+        # help text for switching pages
+        self.num_pages = 0
+        self.page_help = {}
         self.notebook.append_page(sw_all, gtk.Label(_("All domains")))
+        self.add_page_help("All domains")
         self.notebook.append_page(sw_active, gtk.Label(_("Active domains")))
+        self.add_page_help("Active domains")
 
         # contents
         sw2 = gtk.ScrolledWindow()
@@ -131,7 +191,7 @@ class TomoyoGui:
         self.size_group = gtk.SizeGroup(gtk.SIZE_GROUP_HORIZONTAL)
 
         # show initial help
-        self.show_help()
+        self.show_help(0)
 
         self.window.show_all()
 
@@ -141,6 +201,12 @@ class TomoyoGui:
         sw_exceptions, self.exceptions = self.build_list_of_exceptions()
         self.update_exceptions()
         self.notebook.append_page(sw_exceptions, gtk.Label(_("Exceptions")))
+        self.add_page_help("Exceptions")
+
+    def add_page_help(self, page):
+        """Associates tab number with contents"""
+        self.page_help[self.num_pages] = page
+        self.num_pages += 1
 
     def export_policy(self, widget):
         """Exports selected domains into a file"""
@@ -155,23 +221,33 @@ class TomoyoGui:
             self.policy.write_policy(filename, self.selected_domains)
         chooser.destroy()
 
-    def show_help(self):
+    def show_help_for_page(self, notebook, page, page_num):
+        """Shows help for current page"""
+        if page_num in self.page_help:
+            self.show_help(page_num)
+
+    def show_help(self, page):
         """Shows initial help text"""
         # show default text
-        table, cur_row = self.refresh_details(self.domain_details, _("Security Configuration for TOMOYO Linux"))
-        self.__add_row(table, cur_row, _("This application allows you to fine-tune the security settings for TOMOYO."))
-        cur_row += 1
-        self.__add_row(table, cur_row, _("Select a security domain to view and edit its settings."))
-        cur_row += 1
-        self.__add_row(table, cur_row, _("Alternatively, you may double-click on a security domain to select all subdomains for a domain."))
-        cur_row += 1
-        self.__add_row(table, cur_row, _("You may also select a group of domains to apply settings to them at once."))
-        cur_row += 1
-        self.__add_row(table, cur_row, _("Start typing a name of an application to quickly locate it in the list"))
-        cur_row += 1
-        self.__add_row(table, cur_row, _("Use the toolbar to refresh current policy from the kernel, or save your settings."))
-        cur_row += 1
-        self.__add_row(table, cur_row, _("Have a nice TOMOYO experience :)"))
+        tab = self.page_help[page]
+        if tab == "All domains":
+            title = tab
+            help = HELP_ALL_DOMAINS
+        elif tab == "Active domains":
+            title = tab
+            help = HELP_ACTIVE_DOMAINS
+        elif tab == "Exceptions":
+            title = tab
+            help = HELP_EXCEPTIONS
+        else:
+            # default help text
+            title = _("Security Configuration for TOMOYO Linux")
+            help = HELP_DEFAULT
+        if len(help) > 0:
+            table, cur_row = self.refresh_details(self.domain_details, title)
+            for line in help:
+                self.__add_row(table, cur_row, line, markup=True)
+                cur_row += 1
         self.domain_details.show_all()
 
     def save_domains(self, reload=False):
@@ -619,7 +695,7 @@ class TomoyoGui:
                 domains.append(domain)
 
             if len(domains) < 1:
-                self.show_help()
+                self.show_help(0)
                 return
             self.selected_domains = domains
             # update title
@@ -808,6 +884,9 @@ class TomoyoPolicy:
             data = []
             success = False
         exceptions = {}
+        # initialize known exception tykes
+        for exc in ["file_pattern", "allow_read", "deny_rewrite", "alias", "initialize_domain", "no_initialize_domain", "keep_domain", "no_keep_domain"]:
+            exceptions[exc] = []
         for line in data:
             acl, params = line.strip().split(" ", 1)
             if acl not in exceptions:
