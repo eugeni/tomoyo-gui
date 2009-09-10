@@ -113,15 +113,17 @@ class TomoyoGui:
         # domains
         sw_all, self.all_domains = self.build_list_of_domains()
         sw_active, self.active_domains = self.build_list_of_domains()
+        sw_exceptions, self.exceptions = self.build_list_of_exceptions()
 
         self.notebook.append_page(sw_all, gtk.Label(_("All domains")))
         self.notebook.append_page(sw_active, gtk.Label(_("Active domains")))
+        self.notebook.append_page(sw_exceptions, gtk.Label(_("Exceptions")))
 
         # contents
         sw2 = gtk.ScrolledWindow()
         sw2.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
         sw2.set_shadow_type(gtk.SHADOW_ETCHED_IN)
-        frame = gtk.Frame(_("Domain details"))
+        frame = gtk.Frame(_("Details"))
         self.domain_details = gtk.VBox(False, 5)
         frame.add(self.domain_details)
         sw2.add_with_viewport(frame)
@@ -316,6 +318,52 @@ class TomoyoGui:
         # leave
         sys.exit(0)
 
+
+    def build_list_of_exceptions(self):
+        """Builds scrollable list of exceptions"""
+        # scrolled window
+        sw = gtk.ScrolledWindow()
+        sw.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
+        sw.set_shadow_type(gtk.SHADOW_ETCHED_IN)
+
+        # list of options
+        lstore = gtk.ListStore(
+            gobject.TYPE_STRING,
+            gobject.TYPE_STRING,
+            gobject.TYPE_INT,
+            gobject.TYPE_INT)
+
+        # treeview
+        treeview = gtk.TreeView(lstore)
+        treeview.set_rules_hint(True)
+        treeview.set_search_column(self.COLUMN_PATH)
+
+        treeview.connect('row-activated', self.expand_domain, lstore)
+
+        # selection
+        selection = treeview.get_selection()
+        selection.set_mode(gtk.SELECTION_MULTIPLE)
+        selection.connect('changed', self.select_domain)
+
+        # configuring columns
+
+        # column for option names
+        renderer = gtk.CellRendererText()
+        renderer.set_property('width', 400)
+        column = gtk.TreeViewColumn(_('Security domain'), renderer, text=self.COLUMN_PATH, weight=self.COLUMN_WEIGHT)
+        column.set_resizable(True)
+        column.set_expand(True)
+        treeview.append_column(column)
+
+        sw.add(treeview)
+
+        # search
+        def search_domain(model, column, key, iter, data=None):
+            path = model.get_value(iter, self.COLUMN_PATH)
+            return path.find(key) < 0
+        treeview.set_search_equal_func(func=search_domain)
+
+        return sw, lstore
 
     def build_list_of_domains(self):
         """Builds scrollable list of domains"""
@@ -653,15 +701,17 @@ class TomoyoPolicy:
         self.version = version
         if policy == "kernel":
             self.location = "/sys/kernel/security/tomoyo/domain_policy"
+            self.exceptions_location = "/sys/kernel/security/tomoyo/exception_policy"
         else:
             self.location = "/etc/%s/domain_policy.conf" % version
+            self.exceptions_location = "/etc/%s/exception_policy.conf" % version
         self.save_location = "domain_policy.conf"
 
     def reload(self):
         """Reloads the policy. If using system policy, current kernel policy is saved first"""
         if self.policy == "system":
             os.system(self.POLICY_SAVE)
-        success, self.policy, self.policy_dict, self.policy_tree = self.read_policy(self.location)
+        success, self.policy, self.policy_dict, self.policy_tree, self.exceptions = self.read_policy(self.location)
         return success
 
     def read_policy(self, location):
@@ -675,6 +725,7 @@ class TomoyoPolicy:
             print >>sys.stderr, "Unable to open policy file: %s" % self.location
             data = []
             success = False
+        # read domains
         domains = []
         domains_dict = {}
         domains_tree = []
@@ -715,7 +766,22 @@ class TomoyoPolicy:
                 # an ACL
                 command, params = line.split(" ", 1)
                 domains_dict[domain].append((command, params))
-        return success, domains, domains_dict, domains_tree
+        # read exceptions
+        try:
+            with open(self.exceptions_location) as fd:
+                data = fd.readlines()
+        except:
+            # unable to open policy file
+            print >>sys.stderr, "Unable to open policy file: %s" % self.location
+            data = []
+            success = False
+        exceptions = {}
+        for line in data:
+            acl, params = line.strip().split(" ", 1)
+            if acl not in exceptions:
+                exceptions[acl] = []
+            exceptions[acl].append(params)
+        return success, domains, domains_dict, domains_tree, exceptions
 
     def save(self, reload=True):
         """Saves the policy. If reload=True, the saved policy is loaded into kernel"""
