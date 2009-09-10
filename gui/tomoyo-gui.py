@@ -113,11 +113,9 @@ class TomoyoGui:
         # domains
         sw_all, self.all_domains = self.build_list_of_domains()
         sw_active, self.active_domains = self.build_list_of_domains()
-        sw_exceptions, self.exceptions = self.build_list_of_exceptions()
 
         self.notebook.append_page(sw_all, gtk.Label(_("All domains")))
         self.notebook.append_page(sw_active, gtk.Label(_("Active domains")))
-        self.notebook.append_page(sw_exceptions, gtk.Label(_("Exceptions")))
 
         # contents
         sw2 = gtk.ScrolledWindow()
@@ -138,6 +136,11 @@ class TomoyoGui:
         self.window.show_all()
 
         self.refresh_domains(self.all_domains, self.active_domains)
+
+        # now building exceptions
+        sw_exceptions, self.exceptions = self.build_list_of_exceptions()
+        self.update_exceptions()
+        self.notebook.append_page(sw_exceptions, gtk.Label(_("Exceptions")))
 
     def export_policy(self, widget):
         """Exports selected domains into a file"""
@@ -254,6 +257,20 @@ class TomoyoGui:
                 add_to_liststore(lstore_active, path, item, color, level)
             add_to_liststore(lstore_all, path, item, color, level)
 
+    def update_exceptions(self):
+        """Updates the list of exceptions"""
+        def add_to_liststore(lstore, item):
+            iter = lstore.append()
+            lstore.set(iter,
+                    self.COLUMN_PATH, item,
+                    )
+
+        for exc in self.exceptions:
+            lstore = self.exceptions[exc]
+            lstore.clear()
+            for item in self.policy.exceptions[exc]:
+                add_to_liststore(lstore, item)
+
     def process_events(self):
         """Process pending gtk events"""
         while gtk.events_pending():
@@ -321,6 +338,23 @@ class TomoyoGui:
 
     def build_list_of_exceptions(self):
         """Builds scrollable list of exceptions"""
+        # tabs
+        exceptions = {}
+        vbox = gtk.VBox()
+        notebook = gtk.Notebook()
+        vbox.pack_start(notebook)
+
+        classes = self.policy.exceptions.keys()
+        classes.sort()
+        for item in classes:
+            sw_exceptions, exceptions_list = self.build_exceptions_for_class(item)
+            notebook.append_page(sw_exceptions, gtk.Label(item))
+            exceptions[item] = exceptions_list
+        vbox.show_all()
+        return vbox, exceptions
+
+    def build_exceptions_for_class(self, item):
+        """Builds list of exceptions of given type"""
         # scrolled window
         sw = gtk.ScrolledWindow()
         sw.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
@@ -329,28 +363,26 @@ class TomoyoGui:
         # list of options
         lstore = gtk.ListStore(
             gobject.TYPE_STRING,
-            gobject.TYPE_STRING,
-            gobject.TYPE_INT,
-            gobject.TYPE_INT)
+            )
 
         # treeview
         treeview = gtk.TreeView(lstore)
         treeview.set_rules_hint(True)
         treeview.set_search_column(self.COLUMN_PATH)
 
-        treeview.connect('row-activated', self.expand_domain, lstore)
+        #treeview.connect('row-activated', self.expand_domain, lstore)
 
         # selection
         selection = treeview.get_selection()
         selection.set_mode(gtk.SELECTION_MULTIPLE)
-        selection.connect('changed', self.select_domain)
+        #selection.connect('changed', self.select_domain)
 
         # configuring columns
 
         # column for option names
         renderer = gtk.CellRendererText()
         renderer.set_property('width', 400)
-        column = gtk.TreeViewColumn(_('Security domain'), renderer, text=self.COLUMN_PATH, weight=self.COLUMN_WEIGHT)
+        column = gtk.TreeViewColumn(_('Exception'), renderer, text=self.COLUMN_PATH)
         column.set_resizable(True)
         column.set_expand(True)
         treeview.append_column(column)
