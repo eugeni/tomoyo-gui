@@ -41,7 +41,7 @@ class TomoyoInstaller(Thread):
             self.finish_install.put(res)
         except:
             print "Aborted: %s" % sys.exc_value
-            self.finish_install.put(False)
+            self.finish_install.put(-1)
 
 class TomoyoGui:
     (COLUMN_PATH, COLUMN_DOMAIN, COLUMN_WEIGHT, COLUMN_LEVEL) = range(4)
@@ -296,25 +296,25 @@ class TomoyoGui:
 
         progress.destroy()
 
-        if result != False:
-            text = _("TOMOYO policy was initialized successfully. Please reboot your machine to activate and start using it."),
+        if result == 0:
+            text = _("TOMOYO policy was initialized successfully. Please reboot your machine to activate and start using it.")
             type = gtk.MESSAGE_INFO
         else:
-            text = _("An error occured while initializing TOMOYO policy. You might have to run /usr/lib/ccs/tomoyo_init_policy.sh manually."),
+            text = _("An error occured while initializing TOMOYO policy. You might have to run /usr/lib/ccs/tomoyo_init_policy.sh manually.")
             type = gtk.MESSAGE_ERROR
         # policy was initialized
         dialog = gtk.MessageDialog(
                 parent=self.window,
                 flags=0,
                 type=type,
-                message_format = text,
+                message_format=text,
                 buttons=gtk.BUTTONS_OK
                 )
         dialog.show_all()
         dialog.run()
         dialog.destroy()
         # leave
-        gtk.main_quit()
+        sys.exit(0)
 
 
     def build_list_of_domains(self):
