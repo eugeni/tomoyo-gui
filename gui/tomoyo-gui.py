@@ -12,6 +12,10 @@ import datetime
 import getopt
 import sys
 
+from threading import Thread
+from Queue import Queue
+import time
+
 DEBUG=False
 
 # localization
@@ -20,6 +24,24 @@ try:
     gettext.install("msec")
 except IOError:
     _ = str
+
+class TomoyoInstaller(Thread):
+    # tomoyo policy installer
+    def __init__(self, finish_install, installer="/usr/lib/ccs/tomoyo_init_policy.sh"):
+        Thread.__init__(self)
+        """Initializes policy installer. finish_install is a Queue item that will be filled when job has ended."""
+        self.finish_install = finish_install
+        self.installer = installer
+
+    def run(self):
+        """Installs tomoyo policy"""
+        print "Running %s" % self.installer
+        try:
+            res = os.system(self.installer)
+            self.finish_install.put(res)
+        except:
+            print "Aborted: %s" % sys.exc_value
+            self.finish_install.put(False)
 
 class TomoyoGui:
     (COLUMN_PATH, COLUMN_DOMAIN, COLUMN_WEIGHT, COLUMN_LEVEL) = range(4)
@@ -182,10 +204,9 @@ class TomoyoGui:
 
             # show window
             progress.show_all()
-            while gtk.events_pending():
-                gtk.main_iteration(False)
+            self.process_events()
 
-            # reload policy
+            ## reload policy
             ret = self.policy.reload()
 
             # kill progress window
@@ -197,12 +218,18 @@ class TomoyoGui:
                         parent=self.window,
                         flags=0,
                         type=gtk.MESSAGE_ERROR,
-                        message_format = _("Unable to load TOMOYO policy! Please certify that ccs-tools package is installed and operational and run /usr/lib/ccs/tomoyo_init_policy.sh."),
-                        buttons=gtk.BUTTONS_OK
-                        )
+                        message_format = _("TOMOYO policy not found or not initialized. Do you want to initialize the default TOMOYO policy?"),
+                        buttons=gtk.BUTTONS_YES_NO)
                 dialog.show_all()
-                dialog.run()
+                ret = dialog.run()
+
                 dialog.destroy()
+                if ret == gtk.RESPONSE_YES:
+                    # installing policy
+                    self.install_policy()
+                    # try reloading the policy again
+                    self.policy.reload()
+
 
         lstore_all.clear()
         lstore_active.clear()
@@ -226,6 +253,49 @@ class TomoyoGui:
                 color = pango.WEIGHT_BOLD
                 add_to_liststore(lstore_active, path, item, color, level)
             add_to_liststore(lstore_all, path, item, color, level)
+
+    def process_events(self):
+        """Process pending gtk events"""
+        while gtk.events_pending():
+            gtk.main_iteration(False)
+
+    def install_policy(self):
+        """Installs tomoyo policy"""
+        # progress bar
+        progress = gtk.Window()
+        progress.set_title(_("Please wait..."))
+        progress.set_transient_for(self.window)
+        progress.set_modal(True)
+        progress.connect('delete-event', lambda *w: None)
+
+        vbox = gtk.VBox(spacing=10)
+        progress.add(vbox)
+        progressbar = gtk.ProgressBar()
+        progressbar.set_text(_("Initializing TOMOYO policy..."))
+        vbox.pack_start(progressbar)
+
+        label = gtk.Label(_("Please wait, this might take a few minutes."))
+        vbox.pack_start(label)
+
+        # show window
+        progress.show_all()
+
+        self.process_events()
+        # queue to signal that job is finished
+        q = Queue()
+
+        installer = TomoyoInstaller(finish_install=q)
+        installer.start()
+
+        while 1:
+            self.process_events()
+            if not q.empty():
+                break
+            else:
+                progressbar.pulse()
+                time.sleep(0.5)
+
+        progress.destroy()
 
     def build_list_of_domains(self):
         """Builds scrollable list of domains"""
@@ -700,5 +770,9 @@ if __name__ == "__main__":
 
     policy = TomoyoPolicy()
 
+    gtk.gdk.threads_init()
+
+    gtk.gdk.threads_enter()
     TomoyoGui(policy, embed=PlugWindowID)
+    gtk.gdk.threads_leave()
     gtk.main()
