@@ -39,15 +39,15 @@ def multiline_help(help):
 HELP_ALL_DOMAINS=multiline_help([_("""This view displays all security domains known to TOMOYO.
 Each domain represents the complete application execution chain, from kernel to the last executed application.
 To simplify the visualization, subdomains are displayed on separate lines."""),
-_("""If you click on a domain, you may change the TOMOYO settings for it, such as the execution policy
+_("""If you click on a domain, you may change the TOMOYO settings for it, such as the execution profile
 (which specifies whether TOMOYO should ignore this domain, learn its actions, preview or enforce the security settings).
-By default, all domains are disabled. To start using TOMOYO, select a domain and change its policy to Learning.
+By default, all domains are disabled. To start using TOMOYO, select a domain and change its profile to Learning.
 Afterwards, use the application normally. TOMOYO will learn from the application actions, such as file accesses, application executions and so on.
 """)
 ])
 
 HELP_ACTIVE_DOMAINS=multiline_help([_("""This view displays all security domains known to TOMOYO which are currently enabled.
-For these domains, the TOMOYO policy is either in Learning, Permissive or Enforced mode.
+For these domains, the TOMOYO profile is either in Learning, Permissive or Enforced mode.
 You may use this view to have a quick view on security domains currently active on your system.
 """)])
 
@@ -426,6 +426,7 @@ class TomoyoGui:
         exceptions = {}
         vbox = gtk.VBox()
         notebook = gtk.Notebook()
+        notebook.set_scrollable(True)
         vbox.pack_start(notebook)
 
         classes = self.policy.exceptions.keys()
