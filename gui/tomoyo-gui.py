@@ -81,14 +81,25 @@ Have a nice TOMOYO experience :)
 
 class TomoyoInstaller(Thread):
     # tomoyo policy installer
-    def __init__(self, finish_install, installer="/usr/lib/ccs/tomoyo_init_policy.sh"):
+    def __init__(self, finish_install, installer="/usr/lib/ccs/tomoyo_init_policy.sh", cleaner="rm -rf /etc/tomoyo"):
         Thread.__init__(self)
         """Initializes policy installer. finish_install is a Queue item that will be filled when job has ended."""
         self.finish_install = finish_install
         self.installer = installer
+        self.cleaner = cleaner
+
+    def clean(self):
+        """Removes old tomoyo policy"""
+        if self.cleaner:
+            try:
+                print "Removing old policy"
+                os.system(self.cleaner)
+            except:
+                pass
 
     def run(self):
         """Installs tomoyo policy"""
+        self.clean()
         print "Running %s" % self.installer
         try:
             res = os.system(self.installer)
@@ -148,6 +159,16 @@ class TomoyoGui:
         self.export_domains.connect("clicked", self.export_policy)
         self.export_domains.set_tooltip_text(_("Export selected policy"))
         self.export_domains.set_sensitive(False)
+        self.selected_domains = None
+        toolbar.insert(self.export_domains, -1)
+
+        toolbar.insert(gtk.SeparatorToolItem(), -1)
+
+        # policy initializing
+        self.export_domains = gtk.ToolButton("Initialize")
+        self.export_domains.set_stock_id(gtk.STOCK_REVERT_TO_SAVED)
+        self.export_domains.connect("clicked", self.install_policy)
+        self.export_domains.set_tooltip_text(_("Initialize policy"))
         self.selected_domains = None
         toolbar.insert(self.export_domains, -1)
 
@@ -360,7 +381,7 @@ class TomoyoGui:
         while gtk.events_pending():
             gtk.main_iteration(False)
 
-    def install_policy(self):
+    def install_policy(self, widget=None):
         """Installs tomoyo policy"""
         # progress bar
         progress = gtk.Window()
@@ -400,7 +421,7 @@ class TomoyoGui:
         progress.destroy()
 
         if result == 0:
-            text = _("TOMOYO policy was initialized successfully. Please reboot your machine to activate and start using it.")
+            text = _("TOMOYO policy was initialized successfully. Please reboot your machine to activate and start using it, otherwise the initialized policy could be lost.")
             type = gtk.MESSAGE_INFO
         else:
             text = _("An error occured while initializing TOMOYO policy. You might have to run /usr/lib/ccs/tomoyo_init_policy.sh manually.")
