@@ -11,6 +11,7 @@ from stat import *
 import datetime
 import getopt
 import sys
+import traceback
 
 from threading import Thread
 from Queue import Queue
@@ -163,15 +164,24 @@ class TomoyoGui:
         self.selected_domains = None
         toolbar.insert(self.export_domains, -1)
 
+        # policy importing
+        self.import_domains = gtk.ToolButton("Import")
+        self.import_domains.set_stock_id(gtk.STOCK_OPEN)
+        self.import_domains.connect("clicked", self.import_policy)
+        self.import_domains.set_tooltip_text(_("Import selected policy"))
+        self.import_domains.set_sensitive(True)
+        self.selected_domains = None
+        toolbar.insert(self.import_domains, -1)
+
         toolbar.insert(gtk.SeparatorToolItem(), -1)
 
         # policy initializing
-        self.export_domains = gtk.ToolButton("Initialize")
-        self.export_domains.set_stock_id(gtk.STOCK_REVERT_TO_SAVED)
-        self.export_domains.connect("clicked", self.install_policy)
-        self.export_domains.set_tooltip_text(_("Initialize policy"))
+        self.initialize_domains = gtk.ToolButton("Initialize")
+        self.initialize_domains.set_stock_id(gtk.STOCK_REVERT_TO_SAVED)
+        self.initialize_domains.connect("clicked", self.install_policy)
+        self.initialize_domains.set_tooltip_text(_("Initialize policy"))
         self.selected_domains = None
-        toolbar.insert(self.export_domains, -1)
+        toolbar.insert(self.initialize_domains, -1)
 
         toolbar.insert(gtk.SeparatorToolItem(), -1)
 
@@ -247,6 +257,68 @@ class TomoyoGui:
             filename = chooser.get_filename()
             self.policy.write_policy(filename, self.selected_domains)
         chooser.destroy()
+
+    def import_policy(self, widget):
+        """Imports a policy"""
+        chooser = gtk.FileChooserDialog(title=_("Policy import"),action=gtk.FILE_CHOOSER_ACTION_OPEN,
+                      buttons=(gtk.STOCK_CANCEL,gtk.RESPONSE_CANCEL,gtk.STOCK_SAVE,gtk.RESPONSE_OK))
+        response = chooser.run()
+        if response != gtk.RESPONSE_OK:
+            dialog.destroy()
+            return
+        filename = chooser.get_filename()
+        chooser.destroy()
+        num_updates, domains = self.policy.import_policy(filename)
+        if num_updates < 0:
+            # error while importing, probably caused by invalid file
+            dialog = gtk.MessageDialog(
+                    parent=self.window,
+                    flags=0,
+                    type=gtk.MESSAGE_ERROR,
+                    message_format = _("Unable to import policy! Please certify that %s is a valid TOMOYO policy file.") % filename,
+                    buttons=gtk.BUTTONS_OK
+                    )
+            dialog.show_all()
+            dialog.run()
+            dialog.destroy()
+            return
+        # confirming before importing
+        dialog = gtk.Dialog(_("Importing policy"),
+                self.window, 0,
+                (gtk.STOCK_OK, gtk.RESPONSE_OK,
+                gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL))
+        dialog.set_default_size(600, 240)
+        label = gtk.Label(_("Importing policy from %s"))
+        dialog.vbox.pack_start(gtk.Label(_("Importing policy from %s") % filename), False, False)
+        dialog.vbox.pack_start(gtk.HSeparator(), False, False)
+        dialog.vbox.pack_start(gtk.Label(_("Number of entries in policy: %d") % len(domains)), False, False)
+        dialog.vbox.pack_start(gtk.Label(_("Number of entries which overwrite current policy: %d") % num_updates), False, False)
+        # showing policy content
+        buffer = gtk.TextBuffer()
+        buffer.set_text("\n".join(domains))
+        sw = gtk.ScrolledWindow()
+        sw.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
+        sw.set_shadow_type(gtk.SHADOW_ETCHED_IN)
+        frame = gtk.Frame(_("List of domains to be imported:"))
+        label = gtk.TextView(buffer)
+        label.set_wrap_mode(gtk.WRAP_WORD_CHAR)
+        label.set_editable(False)
+        sw.add_with_viewport(label)
+        frame.add(sw)
+        dialog.vbox.pack_start(frame)
+
+        dialog.show_all()
+        response = dialog.run()
+        dialog.destroy()
+        if response != gtk.RESPONSE_OK:
+            return
+
+        # now really import
+        num_updates, domains = self.policy.import_policy(filename, merge=True)
+        # save and reload everything
+        self.save_domains()
+        self.refresh_domains(self.all_domains, self.active_domains, reload=True)
+
 
     def show_help_for_page(self, notebook, page, page_num):
         """Shows help for current page"""
@@ -873,7 +945,7 @@ class TomoyoPolicy:
         """Reads a policy from file"""
         success = True
         try:
-            with open(self.location) as fd:
+            with open(location) as fd:
                 data = fd.readlines()
         except:
             # unable to open policy file
@@ -919,9 +991,41 @@ class TomoyoPolicy:
                 domains_tree.append((curpath, curlevel))
             else:
                 # an ACL
-                command, params = line.split(" ", 1)
-                domains_dict[domain].append((command, params))
+                try:
+                    command, params = line.split(" ", 1)
+                    domains_dict[domain].append((command, params))
+                except:
+                    # syntax error?
+                    success = False
+                    break
         return success, domains, domains_dict, domains_tree
+
+    def import_policy(self, location, merge=False):
+        """Imports part of policy. If merge=True, merges imported policy into the system one."""
+        try:
+            if DEBUG:
+                print "Importing from %s" % location
+            success, domains, domains_dict, domains_tree = self.read_policy(location)
+            if not success:
+                # import error
+                return -1, []
+            num_updates = 0
+            # remove duplicates
+            for domain in domains:
+                if domain in self.policy:
+                    num_updates += 1
+                    if merge:
+                        domain_pos = self.policy.index(domain)
+                        del self.policy[domain_pos]
+                        del self.policy_dict[domain]
+            if merge:
+                self.policy.extend(domains)
+                self.policy_dict.update(domains_dict)
+            return num_updates, domains
+        except:
+            # something is wrong with the policy format
+            traceback.print_exc()
+            return -1, []
 
     def save(self, reload=True):
         """Saves the policy. If reload=True, the saved policy is loaded into kernel"""
