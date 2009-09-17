@@ -1,6 +1,7 @@
 Mandriva Tomoyo GUI -- History of user-visible changes
 Copyright (C) 2009, Mandriva
 
+* Implemented policy importing
 * Support initializing tomoyo policy from toolbar
 
 Version 0.04 (released 2009-09-10)
