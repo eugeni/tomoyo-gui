@@ -925,7 +925,7 @@ class TomoyoPolicy:
                 data = fd.readlines()
         except:
             # unable to open policy file
-            print >>sys.stderr, "Unable to open policy file: %s" % self.exceptions_location
+            print >>sys.stderr, "Unable to open exceptions file: %s" % self.exceptions_location
             data = []
             success = False
         exceptions = {}
