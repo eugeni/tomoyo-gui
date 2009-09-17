@@ -412,7 +412,7 @@ class TomoyoGui:
                 dialog.destroy()
                 if ret == gtk.RESPONSE_YES:
                     # installing policy
-                    self.install_policy()
+                    self.install_policy(confirm=False)
 
 
         lstore_all.clear()
@@ -457,8 +457,20 @@ class TomoyoGui:
         while gtk.events_pending():
             gtk.main_iteration(False)
 
-    def install_policy(self, widget=None):
+    def install_policy(self, widget=None, confirm=True):
         """Installs tomoyo policy"""
+        if confirm:
+            dialog = gtk.MessageDialog(
+                    parent=self.window,
+                    flags=0,
+                    type=gtk.MESSAGE_ERROR,
+                    message_format = _("Do you really want to initialize TOMOYO policy? This will remove all your settings and reset policy to default state!"),
+                    buttons=gtk.BUTTONS_YES_NO)
+            dialog.show_all()
+            ret = dialog.run()
+            dialog.destroy()
+            if ret != gtk.RESPONSE_YES:
+                return
         # progress bar
         progress = gtk.Window()
         progress.set_title(_("Please wait..."))
