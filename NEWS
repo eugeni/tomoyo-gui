@@ -1,6 +1,7 @@
 Mandriva Tomoyo GUI -- History of user-visible changes
 Copyright (C) 2009, Mandriva
 
+* Asking for confirmation before initializing policy from toolbar
 * Implemented policy importing
 * Support initializing tomoyo policy from toolbar
 
