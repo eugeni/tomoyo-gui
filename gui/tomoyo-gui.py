@@ -112,7 +112,7 @@ class TomoyoGui:
     (COLUMN_PATH, COLUMN_DOMAIN, COLUMN_WEIGHT, COLUMN_LEVEL) = range(4)
     DOMAINS=[_("Disabled"), _("Learning"), _("Permissive"), _("Enforced")]
 
-    def __init__(self, policy, embed=None, execution_path="/usr/share/tomoyo-mdv"):
+    def __init__(self, policy, exceptions, embed=None, execution_path="/usr/share/tomoyo-mdv"):
         """Initializes main window and GUI"""
         if embed:
             self.window = gtk.Plug(embed)
@@ -123,6 +123,7 @@ class TomoyoGui:
         self.window.connect('delete-event', lambda *w: gtk.main_quit())
 
         self.policy = policy
+        self.exceptions = exceptions
         self.execution_path = execution_path
 
         # main vbox
@@ -220,7 +221,7 @@ class TomoyoGui:
         self.refresh_domains(self.all_domains, self.active_domains)
 
         # now building exceptions
-        sw_exceptions, self.exceptions = self.build_list_of_exceptions()
+        sw_exceptions, self.ls_exceptions = self.build_list_of_exceptions()
         self.update_exceptions()
         self.notebook.append_page(sw_exceptions, gtk.Label(_("Exceptions")))
         self.add_page_help("Exceptions")
@@ -316,8 +317,11 @@ class TomoyoGui:
             progress.show_all()
             self.process_events()
 
-            ## reload policy
+            # reload policy
             ret = self.policy.reload()
+
+            # reload exceptions
+            ret = self.exceptions.reload()
 
             # kill progress window
             progress.destroy()
@@ -370,10 +374,10 @@ class TomoyoGui:
                     self.COLUMN_PATH, item,
                     )
 
-        for exc in self.exceptions:
-            lstore = self.exceptions[exc]
+        for exc in self.ls_exceptions:
+            lstore = self.ls_exceptions[exc]
             lstore.clear()
-            for item in self.policy.exceptions[exc]:
+            for item in self.exceptions.exceptions[exc]:
                 add_to_liststore(lstore, item)
 
     def process_events(self):
@@ -450,7 +454,7 @@ class TomoyoGui:
         notebook.set_scrollable(True)
         vbox.pack_start(notebook)
 
-        classes = self.policy.exceptions.keys()
+        classes = self.exceptions.exceptions.keys()
         classes.sort()
         for item in classes:
             sw_exceptions, exceptions_list = self.build_exceptions_for_class(item)
@@ -854,17 +858,15 @@ class TomoyoPolicy:
         self.version = version
         if policy == "kernel":
             self.location = "/sys/kernel/security/tomoyo/domain_policy"
-            self.exceptions_location = "/sys/kernel/security/tomoyo/exception_policy"
         else:
             self.location = "/etc/%s/domain_policy.conf" % version
-            self.exceptions_location = "/etc/%s/exception_policy.conf" % version
         self.save_location = "domain_policy.conf"
 
     def reload(self):
         """Reloads the policy. If using system policy, current kernel policy is saved first"""
         if self.policy == "system":
             os.system(self.POLICY_SAVE)
-        success, self.policy, self.policy_dict, self.policy_tree, self.exceptions = self.read_policy(self.location)
+        success, self.policy, self.policy_dict, self.policy_tree = self.read_policy(self.location)
         return success
 
     def read_policy(self, location):
@@ -919,25 +921,7 @@ class TomoyoPolicy:
                 # an ACL
                 command, params = line.split(" ", 1)
                 domains_dict[domain].append((command, params))
-        # read exceptions
-        try:
-            with open(self.exceptions_location) as fd:
-                data = fd.readlines()
-        except:
-            # unable to open policy file
-            print >>sys.stderr, "Unable to open exceptions file: %s" % self.exceptions_location
-            data = []
-            success = False
-        exceptions = {}
-        # initialize known exception tykes
-        for exc in ["file_pattern", "allow_read", "deny_rewrite", "alias", "initialize_domain", "no_initialize_domain", "keep_domain", "no_keep_domain"]:
-            exceptions[exc] = []
-        for line in data:
-            acl, params = line.strip().split(" ", 1)
-            if acl not in exceptions:
-                exceptions[acl] = []
-            exceptions[acl].append(params)
-        return success, domains, domains_dict, domains_tree, exceptions
+        return success, domains, domains_dict, domains_tree
 
     def save(self, reload=True):
         """Saves the policy. If reload=True, the saved policy is loaded into kernel"""
@@ -971,6 +955,87 @@ class TomoyoPolicy:
                 # compatibility with ccs-savepolicy
                 if acl == "use_policy":
                     print >>fd
+            print >>fd
+
+class TomoyoExceptions:
+    POLICY_LOAD="/usr/sbin/ccs-loadpolicy a"
+    POLICY_SAVE="/usr/sbin/ccs-savepolicy a"
+    def __init__(self, policy="system", version="tomoyo"):
+        """Initializes the exceptions class.
+
+        If version is "tomoyo", LSM version of tomoyo is used.
+        Otherwise, if policy is "ccs", Tomoyo 1.6 policy is used.
+
+        If policy=system, reads policy from /etc/(tomoyo,ccs)/exceptions.
+        If policy=kernel, policy is read from /sys/kernel/security/tomoyo/exceptions"""
+        self.policy = policy
+        self.version = version
+        if policy == "kernel":
+            self.exceptions_location = "/sys/kernel/security/tomoyo/exception_policy"
+        else:
+            self.exceptions_location = "/etc/%s/exception_policy.conf" % version
+        self.save_location = "domain_policy.conf"
+
+    def reload(self):
+        """Reloads the policy. If using system policy, current kernel policy is saved first"""
+        if self.policy == "system":
+            os.system(self.POLICY_SAVE)
+        success, self.exceptions = self.read_policy(self.exceptions_location)
+        return success
+
+    def read_policy(self, location):
+        """Reads a policy from file"""
+        success = True
+        try:
+            with open(location) as fd:
+                data = fd.readlines()
+        except:
+            # unable to open policy file
+            print >>sys.stderr, "Unable to open exceptions file: %s" % self.exceptions_location
+            data = []
+            success = False
+
+        # parse exceptions
+        exceptions = {}
+        # initialize known exception tykes
+        for exc in ["file_pattern", "allow_read", "deny_rewrite", "alias", "initialize_domain", "no_initialize_domain", "keep_domain", "no_keep_domain"]:
+            exceptions[exc] = []
+        for line in data:
+            acl, params = line.strip().split(" ", 1)
+            if acl not in exceptions:
+                exceptions[acl] = []
+            exceptions[acl].append(params)
+        return success, exceptions
+
+    def save(self, reload=True):
+        """Saves the policy. If reload=True, the saved policy is loaded into kernel"""
+        time = datetime.datetime.now().strftime("%F.%T")
+        filename = "exceptions.%s" % time
+        full_filename = "/etc/%s/%s" % (self.version, filename)
+        # are we working on a real file or a symbolic link?
+        try:
+            status = os.lstat(self.location)
+            if S_ISLNK(status.st_mode):
+                # remove old link, new one will be created instead
+                os.unlink(self.location)
+                os.symlink(filename, self.location)
+            else:
+                os.rename(self.location, "%s.bak.%s" % (self.location, time))
+            self.write_exceptions(full_filename, self.exceptions)
+        except:
+            print >>sys.stderr, "Unable to save TOMOYO exceptions: %s" % sys.exc_value[1]
+            return False
+        if reload:
+            os.system(self.POLICY_LOAD)
+        return True
+
+    def write_exceptions(self, filename, entries):
+        """Exports specified entries to a file"""
+        fd = open(filename, "w")
+        for item in entries:
+            print >>fd, "%s\n" % item
+            for acl, val in self.exceptions[item]:
+                print >>fd, "%s %s" % (acl, val)
             print >>fd
 
 # {{{ usage
@@ -1011,10 +1076,11 @@ if __name__ == "__main__":
                 sys.exit(1)
 
     policy = TomoyoPolicy()
+    exceptions = TomoyoExceptions()
 
     gtk.gdk.threads_init()
 
     gtk.gdk.threads_enter()
-    TomoyoGui(policy, embed=PlugWindowID)
+    TomoyoGui(policy, exceptions, embed=PlugWindowID)
     gtk.gdk.threads_leave()
     gtk.main()
