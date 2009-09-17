@@ -928,8 +928,8 @@ class TomoyoGui:
 
 
 class TomoyoPolicy:
-    POLICY_LOAD="/usr/sbin/ccs-loadpolicy a"
-    POLICY_SAVE="/usr/sbin/ccs-savepolicy a"
+    POLICY_LOAD="/usr/sbin/ccs-loadpolicy fsd"
+    POLICY_SAVE="/usr/sbin/ccs-savepolicy fsd"
     def __init__(self, policy="system", version="tomoyo"):
         """Initializes the policy class.
 
@@ -1074,8 +1074,8 @@ class TomoyoPolicy:
             print >>fd
 
 class TomoyoExceptions:
-    POLICY_LOAD="/usr/sbin/ccs-loadpolicy a"
-    POLICY_SAVE="/usr/sbin/ccs-savepolicy a"
+    POLICY_LOAD="/usr/sbin/ccs-loadpolicy fe"
+    POLICY_SAVE="/usr/sbin/ccs-savepolicy fe"
     def __init__(self, policy="system", version="tomoyo"):
         """Initializes the exceptions class.
 
