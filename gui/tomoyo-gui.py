@@ -80,6 +80,25 @@ Use the toolbar to refresh current policy from the kernel, or save your settings
 Have a nice TOMOYO experience :)
 """)])
 
+EXCEPTIONS_HELP={
+    "alias":
+        multiline_help([_("""Specify different paths that point to the same file (e.g., symlinks).""")]),
+    "file_pattern":
+        multiline_help([_("""Patterns that match file accesses in learning mode.""")]),
+    "allow_read":
+        multiline_help([("""Grant unconditionally readable permissions to files.""")]),
+    "deny_rewrite":
+        multiline_help([("""Files not permitted to open for writing without append mode.""")]),
+    "initialize_domain":
+        multiline_help([("""Initialize domain transition when specific program is executed.""")]),
+    "no_initialize_domain":
+        multiline_help([("""Prevent a program from initializing a new domain transition.""")]),
+    "keep_domain":
+        multiline_help([("""Prevent domain transition when program is executed from specific domain.""")]),
+    "no_keep_domain":
+        multiline_help([("""Escape from a domain that is kept by "keep_domain" directive.""")]),
+    }
+
 class TomoyoInstaller(Thread):
     # tomoyo policy installer
     def __init__(self, finish_install, installer="/usr/lib/ccs/tomoyo_init_policy.sh", cleaner="rm -rf /etc/tomoyo"):
@@ -111,6 +130,7 @@ class TomoyoInstaller(Thread):
 
 class TomoyoGui:
     (COLUMN_PATH, COLUMN_DOMAIN, COLUMN_WEIGHT, COLUMN_LEVEL) = range(4)
+    (COLUMN_EXCEPTION, COLUMN_TYPE) = range(2)
     DOMAINS=[_("Disabled"), _("Learning"), _("Permissive"), _("Enforced")]
 
     def __init__(self, policy, exceptions, embed=None, execution_path="/usr/share/tomoyo-mdv"):
@@ -352,8 +372,18 @@ class TomoyoGui:
                 cur_row += 1
         self.domain_details.show_all()
 
+    def format_exception_help(self, type):
+        """Format exception help for each exception type"""
+        if type in EXCEPTIONS_HELP:
+            return EXCEPTIONS_HELP[type]
+        else:
+            return None
+
     def save_domains(self, reload=False):
         """Saves and, optionally, reload current policy"""
+        # saving exceptions
+        ret = self.exceptions.save()
+        # saving policy
         ret = self.policy.save(reload)
         if not ret:
             dialog = gtk.MessageDialog(
@@ -440,17 +470,18 @@ class TomoyoGui:
 
     def update_exceptions(self):
         """Updates the list of exceptions"""
-        def add_to_liststore(lstore, item):
+        def add_to_liststore(lstore, item, type):
             iter = lstore.append()
             lstore.set(iter,
-                    self.COLUMN_PATH, item,
+                    self.COLUMN_EXCEPTION, item,
+                    self.COLUMN_TYPE, type,
                     )
 
         for exc in self.ls_exceptions:
             lstore = self.ls_exceptions[exc]
             lstore.clear()
             for item in self.exceptions.exceptions[exc]:
-                add_to_liststore(lstore, item)
+                add_to_liststore(lstore, item, exc)
 
     def process_events(self):
         """Process pending gtk events"""
@@ -572,6 +603,7 @@ class TomoyoGui:
         # list of options
         lstore = gtk.ListStore(
             gobject.TYPE_STRING,
+            gobject.TYPE_STRING,
             )
 
         # treeview
@@ -583,15 +615,15 @@ class TomoyoGui:
 
         # selection
         selection = treeview.get_selection()
-        selection.set_mode(gtk.SELECTION_MULTIPLE)
-        #selection.connect('changed', self.select_domain)
+        selection.set_mode(gtk.SELECTION_SINGLE)
+        selection.connect('changed', self.select_exception)
 
         # configuring columns
 
         # column for option names
         renderer = gtk.CellRendererText()
         renderer.set_property('width', 400)
-        column = gtk.TreeViewColumn(_('Exception'), renderer, text=self.COLUMN_PATH)
+        column = gtk.TreeViewColumn(_('Exception'), renderer, text=self.COLUMN_EXCEPTION)
         column.set_resizable(True)
         column.set_expand(True)
         treeview.append_column(column)
@@ -675,7 +707,7 @@ class TomoyoGui:
                     params[i] = (p, new_profile)
                     break
 
-    def __add_row(self, table, row, label_text, options=None, markup=False, wrap=False, entry=None):
+    def __add_row(self, table, row, label_text, options=None, markup=False, wrap=False, entry=None, type="domain"):
         label = gtk.Label()
         label.set_use_underline(True)
         label.set_alignment(0, 1)
@@ -690,7 +722,13 @@ class TomoyoGui:
             eventbox = gtk.EventBox()
             eventbox.connect('enter-notify-event', self.show_controls, entry, label)
             eventbox.connect('leave-notify-event', self.hide_controls, entry, label)
-            eventbox.connect('button-press-event', self.edit_entry, entry, label)
+            if type == "domain":
+                eventbox.connect('button-press-event', self.edit_acl_entry, entry, label)
+            elif type == "exception":
+                eventbox.connect('button-press-event', self.edit_exception_entry, entry, label)
+            else:
+                # skip non-implemented stuff
+                pass
             eventbox.add(label)
             item = eventbox
         else:
@@ -711,8 +749,8 @@ class TomoyoGui:
         """Hides controls for an entry"""
         label.set_markup(label.label_text)
 
-    def edit_entry(self, widget, event, entry, label):
-        """Hides controls for an entry"""
+    def edit_acl_entry(self, widget, event, entry, label):
+        """Hides controls for a domain entry"""
         # TODO: handle both buttons
         popupMenu = gtk.Menu()
         menuPopup1 = gtk.ImageMenuItem (gtk.STOCK_EDIT)
@@ -724,6 +762,70 @@ class TomoyoGui:
         popupMenu.show_all()
         popupMenu.popup(None, None, None, 1, 0, entry)
 
+    def edit_exception_entry(self, widget, event, entry, label):
+        """Hides controls for an exception entry"""
+        # TODO: handle both buttons
+        popupMenu = gtk.Menu()
+        menuPopup1 = gtk.ImageMenuItem (gtk.STOCK_EDIT)
+        menuPopup1.connect('activate', self.edit_exception, entry)
+        popupMenu.add(menuPopup1)
+        menuPopup2 = gtk.ImageMenuItem (gtk.STOCK_DELETE)
+        menuPopup2.connect('activate', self.delete_exception, entry)
+        popupMenu.add(menuPopup2)
+        popupMenu.show_all()
+        popupMenu.popup(None, None, None, 1, 0, entry)
+
+    def edit_exception(self, menuitem, entry):
+        """An entry will be changed"""
+        type, pos, item = entry
+        if DEBUG:
+            print "Editing %s [%s]:" % (item, type)
+        dialog = gtk.Dialog(_("Editing exception"),
+                self.window, 0,
+                (gtk.STOCK_OK, gtk.RESPONSE_OK,
+                gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL))
+        dialog.set_default_size(600, -1)
+        # option title
+        label = gtk.Label("Exception type: %s" % type)
+        dialog.vbox.pack_start(label)
+        dialog.vbox.pack_start(gtk.HSeparator())
+
+        # new acl
+        hbox = gtk.HBox(spacing=5)
+        label = gtk.Label(_("<b>Exception:</b>"))
+        label.set_use_markup(True)
+        hbox.pack_start(label, False, False)
+        entry_path = gtk.Entry()
+        entry_path.set_text(item)
+        hbox.pack_start(entry_path)
+        dialog.vbox.pack_start(hbox)
+
+        dialog.show_all()
+        response = dialog.run()
+        if response != gtk.RESPONSE_OK:
+            dialog.destroy()
+            return
+
+        new_item = entry_path.get_text()
+        dialog.destroy()
+
+        self.exceptions.exceptions[type][pos] = new_item
+
+        if DEBUG:
+            print "%s -> %s, %s -> %s" % (item, acl, new_item, new_acl)
+
+        # refresh domain data
+        self.update_exceptions()
+
+    def delete_exception(self, menuitem, entry):
+        """An entry will be deleted"""
+        type, pos, item = entry
+        if DEBUG:
+            print "Deleting %s [%s]:" % (item, type)
+        del self.exceptions.exceptions[type][pos]
+        # refresh exceptions data
+        self.update_exceptions()
+
     def edit_acl(self, menuitem, entry):
         """An entry will be changed"""
         domain, pos, item = entry
@@ -731,10 +833,11 @@ class TomoyoGui:
             print "Editing %s [%s]:" % (domain, item)
         params = self.policy.policy_dict.get(domain)
         acl, path = params[pos]
-        dialog = gtk.Dialog(_("Editing ACL"),
+        dialog = gtk.Dialog(_("Editing"),
                 self.window, 0,
                 (gtk.STOCK_OK, gtk.RESPONSE_OK,
                 gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL))
+        dialog.set_default_size(600, -1)
         # option title
         label = gtk.Label("Domain: %s" % domain)
         dialog.vbox.pack_start(label)
@@ -852,6 +955,34 @@ class TomoyoGui:
             self.domain_details.show_all()
 
             return
+
+    def select_exception(self, selection):
+        """An exception is selected"""
+        self.selected_exceptions = None
+        model, rows = selection.get_selected_rows()
+        if selection.count_selected_rows() == 0:
+            return
+        iter = model.get_iter(rows[0])
+        exception = model.get_value(iter, self.COLUMN_EXCEPTION)
+        type = model.get_value(iter, self.COLUMN_TYPE)
+        table, cur_row = self.refresh_details(self.domain_details, _("Exception details"))
+        # building details
+
+        pos = self.exceptions.exceptions[type].index(exception)
+
+        self.__add_row(table, cur_row, _("<b>%s</b>") % type, markup=True)
+        cur_row += 1
+        help = self.format_exception_help(type)
+        if help:
+            for line in help:
+                self.__add_row(table, cur_row, line, markup=True)
+                cur_row += 1
+        self.__add_row(table, cur_row, exception, type="exception", entry=(type, pos, exception))
+        cur_row += 1
+
+        self.domain_details.show_all()
+
+        return
 
     def refresh_details(self, container, title):
         """Updates description of a domain or group of domains"""
@@ -1090,7 +1221,7 @@ class TomoyoExceptions:
             self.exceptions_location = "/sys/kernel/security/tomoyo/exception_policy"
         else:
             self.exceptions_location = "/etc/%s/exception_policy.conf" % version
-        self.save_location = "domain_policy.conf"
+        self.save_location = "exceptions_policy.conf"
 
     def reload(self):
         """Reloads the policy. If using system policy, current kernel policy is saved first"""
@@ -1126,19 +1257,20 @@ class TomoyoExceptions:
     def save(self, reload=True):
         """Saves the policy. If reload=True, the saved policy is loaded into kernel"""
         time = datetime.datetime.now().strftime("%F.%T")
-        filename = "exceptions.%s" % time
+        filename = "exceptions_policy.%s.conf" % time
         full_filename = "/etc/%s/%s" % (self.version, filename)
         # are we working on a real file or a symbolic link?
         try:
-            status = os.lstat(self.location)
+            status = os.lstat(self.exceptions_location)
             if S_ISLNK(status.st_mode):
                 # remove old link, new one will be created instead
-                os.unlink(self.location)
-                os.symlink(filename, self.location)
+                os.unlink(self.exceptions_location)
+                os.symlink(filename, self.exceptions_location)
             else:
-                os.rename(self.location, "%s.bak.%s" % (self.location, time))
+                os.rename(self.location, "%s.bak.%s" % (self.exceptions_location, time))
             self.write_exceptions(full_filename, self.exceptions)
         except:
+            traceback.print_exc()
             print >>sys.stderr, "Unable to save TOMOYO exceptions: %s" % sys.exc_value[1]
             return False
         if reload:
@@ -1149,10 +1281,8 @@ class TomoyoExceptions:
         """Exports specified entries to a file"""
         fd = open(filename, "w")
         for item in entries:
-            print >>fd, "%s\n" % item
-            for acl, val in self.exceptions[item]:
-                print >>fd, "%s %s" % (acl, val)
-            print >>fd
+            for val in entries[item]:
+                print >>fd, "%s %s" % (item, val)
 
 # {{{ usage
 def usage():
