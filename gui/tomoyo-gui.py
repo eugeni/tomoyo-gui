@@ -101,7 +101,7 @@ EXCEPTIONS_HELP={
 
 class TomoyoInstaller(Thread):
     # tomoyo policy installer
-    def __init__(self, finish_install, installer="/usr/lib/ccs/tomoyo_init_policy.sh", cleaner="rm -rf /etc/tomoyo"):
+    def __init__(self, finish_install, installer="/usr/lib/tomoyo/init_policy", cleaner="rm -rf /etc/tomoyo"):
         Thread.__init__(self)
         """Initializes policy installer. finish_install is a Queue item that will be filled when job has ended."""
         self.finish_install = finish_install
@@ -390,7 +390,7 @@ class TomoyoGui:
                     parent=self.window,
                     flags=0,
                     type=gtk.MESSAGE_ERROR,
-                    message_format = _("Unable to save TOMOYO policy! Please certify that ccs-tools package is installed and operational."),
+                    message_format = _("Unable to save TOMOYO policy! Please certify that tomoyo-tools package is installed and operational."),
                     buttons=gtk.BUTTONS_OK
                     )
             dialog.show_all()
@@ -1059,8 +1059,8 @@ class TomoyoGui:
 
 
 class TomoyoPolicy:
-    POLICY_LOAD="/usr/sbin/ccs-loadpolicy fsd"
-    POLICY_SAVE="/usr/sbin/ccs-savepolicy fsd"
+    POLICY_LOAD="/usr/sbin/tomoyo-loadpolicy fsd"
+    POLICY_SAVE="/usr/sbin/tomoyo-savepolicy fsd"
     def __init__(self, policy="system", version="tomoyo"):
         """Initializes the policy class.
 
@@ -1199,14 +1199,14 @@ class TomoyoPolicy:
             print >>fd, "%s\n" % item
             for acl, val in self.policy_dict[item]:
                 print >>fd, "%s %s" % (acl, val)
-                # compatibility with ccs-savepolicy
+                # compatibility with tomoyo-savepolicy
                 if acl == "use_policy":
                     print >>fd
             print >>fd
 
 class TomoyoExceptions:
-    POLICY_LOAD="/usr/sbin/ccs-loadpolicy fe"
-    POLICY_SAVE="/usr/sbin/ccs-savepolicy fe"
+    POLICY_LOAD="/usr/sbin/tomoyo-loadpolicy fe"
+    POLICY_SAVE="/usr/sbin/tomoyo-savepolicy fe"
     def __init__(self, policy="system", version="tomoyo"):
         """Initializes the exceptions class.
 
